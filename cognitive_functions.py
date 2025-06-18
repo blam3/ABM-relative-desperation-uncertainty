@@ -1,6 +1,9 @@
 
 # TO DO: Change EU terminology to "value".
 
+# To represent ambiguity attitudes, draw values that are more extreme (e.g., drawing from a norm dist with more kurtosis)
+# Could find distribution of risk and ambiguity attitudes that were found empirically.
+
 import numpy as np
 import pandas as pd
 

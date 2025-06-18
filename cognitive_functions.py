@@ -12,11 +12,13 @@ def utility_function(wealth, gamma):
     Returns:
     float: The utility of engaging in rule-breaking behavior.
     """
+# keep gamma in exponent (instead of gamma - 1)
+# Keep restriction that gamma must be greater than 0
     
     if gamma <= 0:
         raise ValueError("gamma_i must be positive")
     
-    return np.sign(wealth) * (np.abs(wealth))**(1 - gamma)
+    return (np.abs(wealth))**(gamma)
 
 # Prelec's probability weighting function
 

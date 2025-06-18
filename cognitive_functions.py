@@ -1,4 +1,6 @@
 
+# TO DO: Change EU terminology to "value".
+
 import numpy as np
 import pandas as pd
 

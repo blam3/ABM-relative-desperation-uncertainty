@@ -10,7 +10,7 @@ A model of agents deciding how to accumulate wealth. All agents start with varyi
 
 2) To break the rules (e.g., property theft) to receive a larger sum of money but with the possibility of being caught and losing money.
 
-As the model runs, the distribution of wealth among agents .
+As the model runs, the distribution of wealth among agents is updated over time.
 
 ## Installation
 To install the dependencies use pip to install mesa[rec]

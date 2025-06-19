@@ -20,14 +20,14 @@ To install the dependencies use pip to install mesa[rec]
 ## How to Run
 To run the model interactively, run solara run in this directory. e.g.
 
-    $ solara run app.py
+    $ dmap run app.py
     
 Then open your browser to http://localhost:insert_id/ and press Reset, then Run.
 
 ## Files
-model.py: Contains creation of agents, the network, and management of agent execution.
-agents.py: Contains logic for giving money, and moving on the network.
-app.py: Contains the code for the interactive Solara visualization.
+model.py: Contains creation of agents, the environment, and management of agent execution.
+agents.py: Contains logic obtaining and losing wealth.
+app.py: Contains the code for the interactive DMAP visualization.
 
 ## Further Reading
 

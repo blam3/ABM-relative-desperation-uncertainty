@@ -27,23 +27,30 @@ def utility_function(starting_wealth, gamma):
 
 # Prelec's probability weighting function
 
-def prelec(p, beta, alpha):
+def prelec(beta, alpha, p):
     """
-    Prelec's (1998) probability weighting function.
+    Prelec's probability weighting function.
     Parameters:
-    p (float): Probability value in the range [0, 1].
-    alpha (float): Parameter that determines the curvature of the weighting function.
-    
+    beta (float): Likelihood sensitivity parameter.
+    alpha (float): Optimism/pessimism parameter.
+    p (float): Probability of being caught engaging in rule-breaking behavior.
     Returns:
     float: Weighted probability.
     """
-    if p < 0 or p > 1:
-        raise ValueError("p must be in the range [0, 1]")
+    if p == 0:
+        return 0
+    try:
+        log_val = -beta * (-np.log(p)) ** alpha
+    except RuntimeWarning:
+        log_val = float('-inf')
     
-#    if alpha <= 0:
-#        raise ValueError("alpha must be positive")
+    # Clamping extremely large or small values
+    if log_val > 700:  # np.log(np.finfo(np.float64).max)
+        log_val = 700
+    elif log_val < -700:  # np.log(np.finfo(np.float64).tiny)
+        log_val = -700
     
-    return np.longdouble(np.exp(-beta*(-np.log(p))**alpha))
+    return np.longdouble(np.exp(log_val))
 
 # Decision-making functions for rule-breaking behavior
 
@@ -66,8 +73,13 @@ def SV_rule_break(reward_rb, cost_rb, starting_wealth, p, gamma, beta, alpha):
     
     # Calculate expected utility of engaging in rule-breaking behavior
     # w(p)u(θ+A)-(1-w(p))u(θ-c)
-    SV_rule_breaking = ( (prelec(p, beta, alpha)) * (utility_function(reward_rb + starting_wealth, gamma) )  ) - ( (1-prelec(p, beta, alpha)) * utility_function(starting_wealth - cost_rb, gamma) )
+    # SV_rule_breaking = ( (prelec(p, beta, alpha)) * (utility_function(reward_rb + starting_wealth, gamma) )  ) - ( (1-prelec(p, beta, alpha)) * utility_function(starting_wealth - cost_rb, gamma) )
     
+    # w(p)u(θ+A)-(1-w(p))u(θ-c)
+    SV_rule_breaking = (prelec(p=p, beta=beta, alpha=alpha) * utility_function(starting_wealth=reward_rb + starting_wealth, gamma=gamma)) + np.negative(- \
+                        ((1 - prelec(p=p, beta=beta, alpha=alpha)) * utility_function(starting_wealth=starting_wealth - cost_rb, gamma=gamma)) )
+
+
     return SV_rule_breaking
 
 # Decision-making function for following rules
@@ -91,12 +103,64 @@ def SV_follow_rules(reward_rf, starting_wealth, gamma):
     
     return SV_following_rules
 
+# Function to calculate income rank
+def income_rank(i,n):
+    """
+    Calculate the income rank of individual i in a reference group of size n.
+    """
+    return (i - 1) / (n - 1)
+
+def desperation_utility_function(lambd, gamma, starting_wealth):
+    """
+    Calculate the utility of engaging in rule-breaking behavior based on relative deprivation.
+    
+    Parameters:
+    income_rank (float): The income rank of the individual in the reference group.
+    lambd (float): The relative deprivation parameter.
+    starting_wealth (float): The initial wealth of the individual.
+    
+    Returns:
+    float: Adjusted utility function value.
+    """
+    
+    return (np.longdouble(np.sign(starting_wealth) * (np.abs(starting_wealth))**(gamma))) + lambd*(-starting_wealth)
+
+def SV_relative_desp_RB(gamma, lambd, starting_wealth, p, beta, alpha, reward_rb, cost_rb):
+    """
+    Adjust the utility function based on relative deprivation.
+    
+    Parameters:
+    income_rank (float): The income rank of the individual in the reference group.
+    gamma (float): The risk aversion parameter.
+    
+    Returns:
+    float: Adjusted utility function value.
+    """
+
+    # Adjust gamma based on relative deprivation
+    SV = (prelec(p=p, beta=beta, alpha=alpha) * desperation_utility_function(starting_wealth=reward_rb + starting_wealth, gamma=gamma, lambd=lambd)) + np.negative(- \
+                        ((1 - prelec(p=p, beta=beta, alpha=alpha)) * desperation_utility_function(starting_wealth=starting_wealth - cost_rb, gamma=gamma, lambd=lambd))  )
+    
+    return SV
 
 # Softmax function
 def softmax(SV_rule_breaking, SV_following_rules):
     """Compute the softmax of vector SVs."""
     SVs = np.array([SV_rule_breaking, SV_following_rules])  # Ensure SVs is a numpy array
+
+    # Check for NaN or inf values
+    if np.isnan(SVs).any():
+        raise ValueError("Input contains NaN values.")
+    if np.isinf(SVs).any():
+        raise ValueError("Input contains infinity values.")
+
     stable_SVs = SVs - SVs.max(axis=0)  # Subtract the max value for numerical stability, preventing overflow in exp
     e_SVs = np.exp(stable_SVs)  # Exponentiate the SVs
-    return e_SVs / e_SVs.sum(axis=0)
+
+    sum_exp_SVs = e_SVs.sum(axis=0)
+    # Prevent division by zero
+    if sum_exp_SVs == 0:
+        return np.zeros_like(SVs)
+    
+    return e_SVs / sum_exp_SVs
 

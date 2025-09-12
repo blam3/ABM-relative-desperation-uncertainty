@@ -8,7 +8,7 @@ import numpy as np
 class rel_DMAP_model(Model):
     """A model with a number of decision makers."""
     def __init__(self, width, height, lambd, gamma, reward_rb, reward_rf, cost_rb, min_start_wealth, p, 
-                 beta_loc, beta_scale, alpha_loc, alpha_scale, num_neighbors):
+                 beta_loc, beta_scale, alpha_loc, alpha_scale, num_neighbors, income_rank_threshold):
         super().__init__()
         self.width = width
         self.height = height
@@ -21,7 +21,6 @@ class rel_DMAP_model(Model):
         self.cost_rb = cost_rb
         self.p = p
 
-        # self.num_neighbors = num_neighbors
         self.desperate_state = 0  # Initialize desperate state to 0 (not desperate)
         self.decision = 0  # Initialize decision to 0 (follow rules)
         self.caught = False  # Initialize caught state to False
@@ -35,7 +34,7 @@ class rel_DMAP_model(Model):
                 model=self, lambd=self.lambd, gamma=self.gamma, reward_rb=self.reward_rb,
                 reward_rf=self.reward_rf, cost_rb=self.cost_rb, min_start_wealth=min_start_wealth,
                 p=self.p, beta_loc=beta_loc, beta_scale=beta_scale, alpha_loc=alpha_loc, 
-                alpha_scale=alpha_scale, num_neighbors=num_neighbors)
+                alpha_scale=alpha_scale, num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
             # Add the agent to the grid at the current position
             self.grid.place_agent(agent, pos)
 
@@ -46,13 +45,13 @@ class rel_DMAP_model(Model):
                              lambda a: getattr(a, "wealth_end", a.wealth), "income rank":"income_rank", 
                              "desperate_state": "desperate_state", "uncert_aver": "beta", "uncert_insensitive": "alpha",
                              "Rule-breaking choice": "decision", "Caught": "caught", "SV_rule_break": "SV_rule_break", 
-                             "SV_follow_rules": "SV_follow_rules"}
+                             "SV_follow_rules": "SV_follow_rules"},
+                             tables = {"table": ["step", "agent_id", "decision", "wealth" ]  }
             )
         self.running = True
         self.datacollector.collect(self)
     
     def step(self):
-        # self.datacollector.collect(self)
         self.agents.do("step")
         self.datacollector.collect(self)
         

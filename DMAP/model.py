@@ -13,6 +13,7 @@ class rel_DMAP_model(Model):
         self.width = width
         self.height = height
         self.grid = SingleGrid(width, height, torus=True)
+        # TODO(from methods): can you explain torus=True + why SingleGrid; also i think it could be helpful to note it's 1 agent per cell
 
         self.lambd = lambd
         self.gamma = gamma
@@ -37,7 +38,7 @@ class rel_DMAP_model(Model):
                 alpha_scale=alpha_scale, num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
             # Add the agent to the grid at the current position
             self.grid.place_agent(agent, pos)
-
+            # TODO(from methods): clarify init density (agent per cell), and how activation works (do we add to model.agents / ordering?)
     
         self.datacollector = mesa.DataCollector(
             model_reporters={"Proportion crime": crime_proportion},
@@ -47,7 +48,8 @@ class rel_DMAP_model(Model):
                              "Rule-breaking choice": "decision", "Caught": "caught", "SV_rule_break": "SV_rule_break", 
                              "SV_follow_rules": "SV_follow_rules"},
                              tables = {"table": ["step", "agent_id", "decision", "wealth" ]  }
-            )
+            ) 
+        # TODO(from methods): I would think it's good to say what each reporter measures + when it's sampled; 'table' aligns w/ multiple within-step logs from agents.step
         self.running = True
         self.datacollector.collect(self)
     

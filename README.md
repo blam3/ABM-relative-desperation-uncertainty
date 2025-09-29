@@ -41,6 +41,8 @@ model.py: Contains creation of agents, the environment, and management of agent 
 agents.py: Contains logic obtaining and losing wealth.
 app.py: Contains the code for the interactive DMAP visualization.
 
+**Note**: Might be helpful to create a separate methods folder to add separate things
+
 ## Further Reading
 
 This model is drawn from economic models of decision-making and presents an integrative approach to rule-breaking. Some examples of further reading on the topic can be found at:

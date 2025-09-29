@@ -16,6 +16,18 @@ As the model runs, the distribution of wealth among agents is updated over time.
 To install the dependencies use pip to install mesa[rec]
 
     $ pip install mesa[rec]
+
+## Technical Details
+
+### MESA Framework
+This model uses the MESA (Multi-Agent Simulation Environment) framework for agent-based modeling. MESA provides the core infrastructure for:
+- Agent creation and management (`mesa.Agent`)
+- Spatial environment with grid-based interactions (`mesa.space.SingleGrid`) 
+- Data collection and analysis (`mesa.DataCollector`)
+- Batch running for parameter sweeps (`mesa.batch_run`)
+
+### Decision-Making: Softmax Function
+Agent decisions between rule-breaking and rule-following use a softmax function (see `cognitive_functions.py`) that converts subjective values into choice probabilities. This stochastic approach models realistic decision-making where agents don't always choose the option with highest expected value, accounting for cognitive noise and imperfect rationality.
     
 ## How to Run
 To run the model interactively, run solara run in this directory. e.g.

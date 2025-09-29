@@ -12,8 +12,7 @@ class rel_DMAP_model(Model):
         super().__init__()
         self.width = width
         self.height = height
-        self.grid = SingleGrid(width, height, torus=True)
-        # TODO(from methods): can you explain torus=True + why SingleGrid; also i think it could be helpful to note it's 1 agent per cell
+        self.grid = SingleGrid(width, height, torus=True)  # Torus=True creates wraparound boundaries; SingleGrid allows 1 agent per cell
 
         self.lambd = lambd
         self.gamma = gamma
@@ -37,8 +36,7 @@ class rel_DMAP_model(Model):
                 p=self.p, beta_loc=beta_loc, beta_scale=beta_scale, alpha_loc=alpha_loc, 
                 alpha_scale=alpha_scale, num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
             # Add the agent to the grid at the current position
-            self.grid.place_agent(agent, pos)
-            # TODO(from methods): clarify init density (agent per cell), and how activation works (do we add to model.agents / ordering?)
+            self.grid.place_agent(agent, pos)  # Agents automatically added to model.agents list; activation order follows grid iteration
     
         self.datacollector = mesa.DataCollector(
             model_reporters={"Proportion crime": crime_proportion},
@@ -49,7 +47,7 @@ class rel_DMAP_model(Model):
                              "SV_follow_rules": "SV_follow_rules"},
                              tables = {"table": ["step", "agent_id", "decision", "wealth" ]  }
             ) 
-        # TODO(from methods): I would think it's good to say what each reporter measures + when it's sampled; 'table' aligns w/ multiple within-step logs from agents.step
+        # Reporters sampled each step; 'table' logs multiple within-step decisions per agent
         self.running = True
         self.datacollector.collect(self)
     

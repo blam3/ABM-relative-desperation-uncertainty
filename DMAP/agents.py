@@ -43,7 +43,7 @@ class individual(FixedAgent):
         self.beta = (t.rvs(df=(model.width*model.height)-1, loc=beta_loc, scale=beta_scale, size=1)).item()
         self.alpha = (t.rvs(df=(model.width*model.height)-1, loc=alpha_loc, scale=alpha_scale, size=1)).item()
 
-        # TODO(fropm methods): can you say why t-dist for alpha/beta + Pareto for wealth (heterogeneity + skew).
+        # t-distribution for alpha/beta captures heterogeneity; Pareto for wealth creates realistic wealth skew
 
         self.wealth = (np.random.pareto(a=3, size=1) * 200 + min_start_wealth).item() # Initial wealth drawn from a Pareto distribution
         self.income_rank_threshold = income_rank_threshold
@@ -58,7 +58,7 @@ class individual(FixedAgent):
         """Determine the relative desperation of the agent based on income rank."""
         # Get neighbors within the specified radius
         neighbors = self.model.grid.get_neighbors(self.pos, moore=True, include_center=False, radius=self.num_neighbors)
-        # TODO(from methods): i think maybe clarify how num_neighbors is a *radius*, how income_rank is computed, and why this threshold, but subject to variability
+        # num_neighbors defines search radius; income_rank = (poorer_neighbors - 1)/(total_neighbors - 1); threshold determines desperation
 
         # Get a vector of the wealth of the agents in the neighborhood
         neighbor_wealths = [neighbor.wealth for neighbor in neighbors] 
@@ -86,8 +86,8 @@ class individual(FixedAgent):
             self.SV_rule_break = cf.SV_rule_break(gamma=self.gamma, reward_rb=self.reward_rb, cost_rb=self.cost_rb, p=self.p, beta=self.beta, alpha=self.alpha, starting_wealth=self.wealth)  # SV of rule breaking
         self.SV_follow_rules = cf.SV_follow_rules(reward_rf=self.reward_rf, starting_wealth=self.wealth, gamma=self.gamma) # SV of following rules
 
-        # Compute the softmax probabilities
-        # TODO(from methods): maybe note how/why we use softmax (stochastic choice) between SV_rb/SV_rf; p = Prob(not caught) feeding those SVs
+        # Compute the softmax probabilities for stochastic choice between options
+        # p = Prob(not caught) when rule-breaking; softmax converts subjective values to choice probabilities
         probs = cf.softmax(self.SV_rule_break, self.SV_follow_rules)
         
         rb_choice = bernoulli.rvs(probs[0])  # Bernoulli trial for rule breaking choice

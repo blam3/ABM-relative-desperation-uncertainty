@@ -12,9 +12,7 @@ class rel_DMAP_model(Model):
         super().__init__()
         self.width = width
         self.height = height
-        self.grid = SingleGrid(width, height, torus=True)
-        # TODO(from methods): can you explain torus=True + why SingleGrid; also i think it could be helpful to note it's 1 agent per cell
-
+        self.grid = SingleGrid(width, height, torus=True) # Torus refers to a grid in which the edges wrap around. One agent per cell.
         self.lambd = lambd
         self.gamma = gamma
         self.reward_rb = reward_rb

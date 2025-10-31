@@ -3,7 +3,7 @@ from mesa.datacollection import DataCollector
 from mesa.space import SingleGrid
 import numpy as np
 
-# from .agents import decision_maker
+from .agents import decision_maker
 
 class rel_DMAP_model(Model):
     """A model with a number of decision makers."""

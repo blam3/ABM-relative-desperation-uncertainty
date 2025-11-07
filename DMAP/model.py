@@ -3,7 +3,27 @@ from mesa.datacollection import DataCollector
 from mesa.space import SingleGrid
 import numpy as np
 
-# from .agents import decision_maker
+from .agents import decision_maker
+
+def crime_proportion(model):
+    agent_crimes = [agent.decision for agent in model.agents]
+    n = model.width * model.height  # Total number of agents in the grid
+    proportion = (sum(agent_crimes) ) / n
+    return proportion
+
+def gini_coefficient(model):
+    """Calculate the Gini coefficient for the wealth distribution of agents in the model."""
+    agent_wealths = [agent.wealth for agent in model.agents]
+    n = len(agent_wealths)
+    if n == 0:
+        return 0  # Avoid division by zero if there are no agents
+    sorted_wealths = np.sort(agent_wealths)
+    cumulative_wealth = np.cumsum(sorted_wealths)
+    total_wealth = cumulative_wealth[-1]
+    
+    # Gini coefficient formula
+    gini = (n + 1 - 2 * np.sum(cumulative_wealth) / total_wealth) / n
+    return gini
 
 class rel_DMAP_model(Model):
     """A model with a number of decision makers."""
@@ -54,26 +74,3 @@ class rel_DMAP_model(Model):
     def step(self):
         self.agents.do("step")
         self.datacollector.collect(self)
-        
-
-    
-# Functions to calculate model metrics
-def crime_proportion(model):
-    agent_crimes = [agent.decision for agent in model.agents]
-    n = model.width * model.height  # Total number of agents in the grid
-    proportion = (sum(agent_crimes) ) / n
-    return proportion
-
-def gini_coefficient(model):
-    """Calculate the Gini coefficient for the wealth distribution of agents in the model."""
-    agent_wealths = [agent.wealth for agent in model.agents]
-    n = len(agent_wealths)
-    if n == 0:
-        return 0  # Avoid division by zero if there are no agents
-    sorted_wealths = np.sort(agent_wealths)
-    cumulative_wealth = np.cumsum(sorted_wealths)
-    total_wealth = cumulative_wealth[-1]
-    
-    # Gini coefficient formula
-    gini = (n + 1 - 2 * np.sum(cumulative_wealth) / total_wealth) / n
-    return gini

@@ -63,7 +63,7 @@ class individual(FixedAgent):
         num_poorer_neighbors = sum(1 for w in neighbor_wealths if w <= self.wealth)
 
         # Calculate the income rank of the agent in its neighborhood
-        income_rank = cf.income_rank(i=num_poorer_neighbors, n=len(neighbors))
+        income_rank = cal_income_rank(i=num_poorer_neighbors, n=len(neighbors))
         self.income_rank = income_rank  # Store the income rank in the agent's attributes
 
         # Label the agent as desperate if their income rank is less than 0
@@ -77,20 +77,21 @@ class individual(FixedAgent):
         """Choose an option based on subjective value. If agent is relatively desperate, use a different utility function."""
         if self.desperate_state == 1:
             # If the agent is relatively desperate, use a different utility function
-            self.SV_rule_break = cf.SV_relative_desp_RB(
+            self.SV_rule_break = SV_relative_desp_RB(
             gamma=self.gamma, starting_wealth=self.wealth, lambd=self.lambd, p=self.p, beta=self.beta, alpha=self.alpha, reward_rb=self.reward_rb, cost_rb=self.cost_rb)
         else:
-            self.SV_rule_break = cf.SV_rule_break(gamma=self.gamma, reward_rb=self.reward_rb, cost_rb=self.cost_rb, p=self.p, beta=self.beta, alpha=self.alpha, starting_wealth=self.wealth)  # SV of rule breaking
-        self.SV_follow_rules = cf.SV_follow_rules(reward_rf=self.reward_rf, starting_wealth=self.wealth, gamma=self.gamma) # SV of following rules
+            self.SV_rule_break = SV_rule_break(gamma=self.gamma, reward_rb=self.reward_rb, cost_rb=self.cost_rb, p=self.p, beta=self.beta, alpha=self.alpha, starting_wealth=self.wealth)  # SV of rule breaking
+        self.SV_follow_rules = SV_follow_rules(reward_rf=self.reward_rf, starting_wealth=self.wealth, gamma=self.gamma) # SV of following rules
 
-        # Compute the softmax probabilities
-        probs = cf.softmax(self.SV_rule_break, self.SV_follow_rules)
-        
-        rb_choice = bernoulli.rvs(probs[0])  # Bernoulli trial for rule breaking choice
-        if rb_choice==1:
-            self.decision = 1 # breaks rules
-        else:
-            self.decision = 0 # follows rules
+        # --- Bounded Softmax Decision Rule ---
+        # tau = satisficing threshold, theta = noise level
+        tau = 1.0  # you can tune this to control conservatism
+        theta = 1.0  # higher = noisier / less rational
+
+        probs = bounded_softmax(self.SV_rule_break, self.SV_follow_rules, tau=tau, theta=theta)
+        rb_choice = bernoulli.rvs(probs[0])
+
+        self.decision = int(rb_choice)  # 1 = breaks rules, 0 = follows
         return rb_choice
     
     def decision_cycle(self):
@@ -146,7 +147,8 @@ class individual(FixedAgent):
             # If the agent chooses to follow the rules
             self.wealth += self.reward_rf
         # Deduct the cost of living (e.g., paying for food, rent, etc.)
-        self.wealth -= np.random.lognormal(mean=2.5, sigma=0.1, size=1)[0]  # Cost of living drawn from a log-normal distribution
+        living_cost_rate = np.clip(np.random.normal(0.6, 0.1), 0.1, 1)
+        self.wealth = self.wealth - (living_cost_rate * self.reward_rf)
 
         # Update the agent's wealth based on the choice made
         self.wealth_end = self.wealth

@@ -1,9 +1,4 @@
 
-# TO DO: Change EU terminology to "value".
-
-# To represent ambiguity attitudes, draw values that are more extreme (e.g., drawing from a norm dist with more kurtosis)
-# Could find distribution of risk and ambiguity attitudes that were found empirically.
-
 import numpy as np
 import pandas as pd
 
@@ -31,9 +26,9 @@ def prelec(beta, alpha, p):
     """
     Prelec's probability weighting function.
     Parameters:
-    beta (float): Likelihood sensitivity parameter.
-    alpha (float): Optimism/pessimism parameter.
-    p (float): Probability of being caught engaging in rule-breaking behavior.
+    beta (float): Uncertainty aversion parameter.
+    alpha (float): Likelihood uncertainty parameter.
+    p (float): Probability of not being caught engaging in rule-breaking behavior.
     Returns:
     float: Weighted probability.
     """
@@ -62,7 +57,7 @@ def SV_rule_break(reward_rb, cost_rb, starting_wealth, p, gamma, beta, alpha):
     reward_rb (float): Instant benefit from rule-breaking behavior.
     cost_rb (float): Cost of engaging in rule-breaking behavior.
     starting_wealth (float): Initial wealth of the individual.
-    p (float): Probability of being caught engaging in rule-breaking behavior.
+    p (float): Probability of not being caught engaging in rule-breaking behavior.
     gamma (float): Risk aversion parameter.
     beta (float): Likelihood sensitivity parameter for Prelec's probability weighting function.
     alpha (float): Optimism/pessimism parameter for Prelec's probability weighting function.
@@ -90,7 +85,7 @@ def SV_follow_rules(reward_rf, starting_wealth, gamma):
     Parameters:
     reward_rf (float): Instant benefit of following the rules.
     starting_wealth (float): Initial wealth of the individual.
-    p (float): Probability of being caught engaging in rule-breaking behavior.
+    p (float): Probability of not being caught engaging in rule-breaking behavior.
     gamma (float): Risk aversion parameter.
     
     Returns:
@@ -99,12 +94,12 @@ def SV_follow_rules(reward_rf, starting_wealth, gamma):
     
     # Calculate expected utility of not engaging in rule-breaking behavior
     total_wealth = reward_rf + starting_wealth
-    SV_following_rules = utility_function(total_wealth, gamma)
+    SV_following_rules = utility_function(total_wealth, gamma=gamma)
     
     return SV_following_rules
 
 # Function to calculate income rank
-def income_rank(i,n):
+def cal_income_rank(i,n):
     """
     Calculate the income rank of individual i in a reference group of size n.
     """
@@ -123,7 +118,7 @@ def desperation_utility_function(lambd, gamma, starting_wealth):
     float: Adjusted utility function value.
     """
     
-    return (np.longdouble(np.sign(starting_wealth) * (np.abs(starting_wealth))**(gamma))) + lambd*(-starting_wealth)
+    return (np.longdouble(np.sign(starting_wealth) * (np.abs(starting_wealth))**(gamma))) + lambd*(np.abs(starting_wealth))
 
 def SV_relative_desp_RB(gamma, lambd, starting_wealth, p, beta, alpha, reward_rb, cost_rb):
     """
@@ -142,6 +137,53 @@ def SV_relative_desp_RB(gamma, lambd, starting_wealth, p, beta, alpha, reward_rb
                         ((1 - prelec(p=p, beta=beta, alpha=alpha)) * desperation_utility_function(starting_wealth=starting_wealth - cost_rb, gamma=gamma, lambd=lambd))  )
     
     return SV
+
+# Softmax function
+def softmax(SV_rule_breaking, SV_following_rules):
+    """Compute the softmax of vector SVs."""
+    SVs = np.array([SV_rule_breaking, SV_following_rules])  # Ensure SVs is a numpy array
+
+    # Check for NaN or inf values
+    if np.isnan(SVs).any():
+        raise ValueError("Input contains NaN values.")
+    if np.isinf(SVs).any():
+        raise ValueError("Input contains infinity values.")
+
+    stable_SVs = SVs - SVs.max(axis=0)  # Subtract the max value for numerical stability, preventing overflow in exp
+    e_SVs = np.exp(stable_SVs)  # Exponentiate the SVs
+
+    sum_exp_SVs = e_SVs.sum(axis=0)
+    # Prevent division by zero
+    if sum_exp_SVs == 0:
+        return np.zeros_like(SVs)
+    
+    return e_SVs / sum_exp_SVs
+
+def bounded_softmax(SV_rb, SV_rf, tau=3, theta=1.5):
+    """
+    Probabilistic bounded-rational choice rule.
+    
+    Parameters
+    ----------
+    SV_rb : float
+        Subjective value of rule-breaking.
+    SV_rf : float
+        Subjective value of rule-following.
+    tau : float
+        Satisficing threshold — the minimum margin needed for rule-breaking
+        to feel 'worth it'. Larger tau = stronger inertia toward rule-following.
+    theta : float
+        Noise / bounded-rationality parameter.
+        Larger theta = more random, less sensitive to value differences.
+        
+    Returns
+    -------
+    list of float
+        [P(rule-break), P(rule-follow)]
+    """
+    delta = (SV_rb - SV_rf - tau) / theta
+    p_rb = 1 / (1 + np.exp(-delta))  # logistic transform
+    return [p_rb, 1 - p_rb]
 
 # Softmax function
 def softmax(SV_rule_breaking, SV_following_rules):

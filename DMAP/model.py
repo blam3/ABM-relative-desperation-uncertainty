@@ -5,6 +5,26 @@ import numpy as np
 
 from .agents import decision_maker
 
+def crime_proportion(model):
+    agent_crimes = [agent.decision for agent in model.agents]
+    n = model.width * model.height  # Total number of agents in the grid
+    proportion = (sum(agent_crimes) ) / n
+    return proportion
+
+def gini_coefficient(model):
+    """Calculate the Gini coefficient for the wealth distribution of agents in the model."""
+    agent_wealths = [agent.wealth for agent in model.agents]
+    n = len(agent_wealths)
+    if n == 0:
+        return 0  # Avoid division by zero if there are no agents
+    sorted_wealths = np.sort(agent_wealths)
+    cumulative_wealth = np.cumsum(sorted_wealths)
+    total_wealth = cumulative_wealth[-1]
+    
+    # Gini coefficient formula
+    gini = (n + 1 - 2 * np.sum(cumulative_wealth) / total_wealth) / n
+    return gini
+
 class rel_DMAP_model(Model):
     """A model with a number of decision makers."""
     def __init__(self, width, height, lambd, gamma, reward_rb, reward_rf, cost_rb, min_start_wealth, p, 
@@ -12,7 +32,8 @@ class rel_DMAP_model(Model):
         super().__init__()
         self.width = width
         self.height = height
-        self.grid = SingleGrid(width, height, torus=True) # Torus refers to a grid in which the edges wrap around. One agent per cell.
+        self.grid = SingleGrid(width, height, torus=True)
+
         self.lambd = lambd
         self.gamma = gamma
         self.reward_rb = reward_rb
@@ -36,7 +57,7 @@ class rel_DMAP_model(Model):
                 alpha_scale=alpha_scale, num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
             # Add the agent to the grid at the current position
             self.grid.place_agent(agent, pos)
-            # TODO(from methods): clarify init density (agent per cell), and how activation works (do we add to model.agents / ordering?)
+
     
         self.datacollector = mesa.DataCollector(
             model_reporters={"Proportion crime": crime_proportion},
@@ -46,34 +67,10 @@ class rel_DMAP_model(Model):
                              "Rule-breaking choice": "decision", "Caught": "caught", "SV_rule_break": "SV_rule_break", 
                              "SV_follow_rules": "SV_follow_rules"},
                              tables = {"table": ["step", "agent_id", "decision", "wealth" ]  }
-            ) 
-        # TODO(from methods): I would think it's good to say what each reporter measures + when it's sampled; 'table' aligns w/ multiple within-step logs from agents.step
+            )
         self.running = True
         self.datacollector.collect(self)
     
     def step(self):
         self.agents.do("step")
         self.datacollector.collect(self)
-        
-
-    
-# Functions to calculate model metrics
-def crime_proportion(model):
-    agent_crimes = [agent.decision for agent in model.agents]
-    n = model.width * model.height  # Total number of agents in the grid
-    proportion = (sum(agent_crimes) ) / n
-    return proportion
-
-def gini_coefficient(model):
-    """Calculate the Gini coefficient for the wealth distribution of agents in the model."""
-    agent_wealths = [agent.wealth for agent in model.agents]
-    n = len(agent_wealths)
-    if n == 0:
-        return 0  # Avoid division by zero if there are no agents
-    sorted_wealths = np.sort(agent_wealths)
-    cumulative_wealth = np.cumsum(sorted_wealths)
-    total_wealth = cumulative_wealth[-1]
-    
-    # Gini coefficient formula
-    gini = (n + 1 - 2 * np.sum(cumulative_wealth) / total_wealth) / n
-    return gini

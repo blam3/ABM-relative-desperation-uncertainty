@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 
@@ -12,14 +11,19 @@ def utility_function(starting_wealth, gamma):
     Returns:
     float: The utility of engaging in rule-breaking behavior.
     """
-# keep gamma in exponent (instead of gamma - 1)
-# Keep restriction that gamma must be greater than 0
-    
+
     if gamma <= 0:
         raise ValueError("gamma must be positive")
-    
-    return np.longdouble(np.sign(starting_wealth) * (np.abs(starting_wealth))**(gamma)) 
 
+    
+# Clamp extreme values to prevent overflow
+    wealth = np.clip(starting_wealth, -1e6, 1e6)
+    if wealth == 0:
+        return 0.0
+    
+    # Use regular float64 instead of longdouble for better performance
+    return np.sign(wealth) * (np.abs(wealth) ** gamma)
+    
 # Prelec's probability weighting function
 
 def prelec(beta, alpha, p):
@@ -34,18 +38,16 @@ def prelec(beta, alpha, p):
     """
     if p == 0:
         return 0
-    try:
-        log_val = -beta * (-np.log(p)) ** alpha
-    except RuntimeWarning:
-        log_val = float('-inf')
+    # Clamp to prevent extreme values
+    log_p = np.clip(np.log(p), -50, 0)  # p is between 0 and 1, so log(p) <= 0
+    inner = (-log_p) ** alpha
+    log_val = -beta * inner
     
-    # Clamping extremely large or small values
-    if log_val > 700:  # np.log(np.finfo(np.float64).max)
-        log_val = 700
-    elif log_val < -700:  # np.log(np.finfo(np.float64).tiny)
-        log_val = -700
+    # Prevent overflow
+    log_val = np.clip(log_val, -700, 700)
     
-    return np.longdouble(np.exp(log_val))
+    return np.exp(log_val)
+
 
 # Decision-making functions for rule-breaking behavior
 
@@ -71,11 +73,12 @@ def SV_rule_break(reward_rb, cost_rb, starting_wealth, p, gamma, beta, alpha):
     # SV_rule_breaking = ( (prelec(p, beta, alpha)) * (utility_function(reward_rb + starting_wealth, gamma) )  ) - ( (1-prelec(p, beta, alpha)) * utility_function(starting_wealth - cost_rb, gamma) )
     
     # w(p)u(θ+A)-(1-w(p))u(θ-c)
-    SV_rule_breaking = (prelec(p=p, beta=beta, alpha=alpha) * utility_function(starting_wealth=reward_rb + starting_wealth, gamma=gamma)) + np.negative(- \
-                        ((1 - prelec(p=p, beta=beta, alpha=alpha)) * utility_function(starting_wealth=starting_wealth - cost_rb, gamma=gamma)) )
-
-
-    return SV_rule_breaking
+    # Calculate utilities with numerical stability
+    w_p = prelec(beta, alpha, p)
+    u_success = utility_function(starting_wealth + reward_rb, gamma)
+    u_failure = utility_function(starting_wealth - cost_rb, gamma)
+    
+    return w_p * u_success - (1 - w_p) * u_failure
 
 # Decision-making function for following rules
 def SV_follow_rules(reward_rf, starting_wealth, gamma):
@@ -86,7 +89,7 @@ def SV_follow_rules(reward_rf, starting_wealth, gamma):
     reward_rf (float): Instant benefit of following the rules.
     starting_wealth (float): Initial wealth of the individual.
     p (float): Probability of not being caught engaging in rule-breaking behavior.
-    gamma (float): Risk aversion parameter.
+    gamma (float):Utility (commonly referred to as risk aversion) parameter.
     
     Returns:
     float: Expected utility.
@@ -107,18 +110,19 @@ def cal_income_rank(i,n):
 
 def desperation_utility_function(lambd, gamma, starting_wealth):
     """
-    Calculate the utility of engaging in rule-breaking behavior based on relative deprivation.
+    Proportional desperation effect based on relative wealth impact.
     
-    Parameters:
-    income_rank (float): The income rank of the individual in the reference group.
-    lambd (float): The relative deprivation parameter.
-    starting_wealth (float): The initial wealth of the individual.
-    
-    Returns:
-    float: Adjusted utility function value.
+    Theory: Based on Relative Deprivation Theory (Runciman, 1966) and 
+    Loss Aversion (Kahneman & Tversky) - desperation effect should be 
+    proportional to baseline utility, not absolute wealth
     """
+    base_utility = utility_function(starting_wealth, gamma)
     
-    return (np.longdouble(np.sign(starting_wealth) * (np.abs(starting_wealth))**(gamma))) + lambd*(np.abs(starting_wealth))
+    # Desperation as percentage increase in utility 
+    # This prevents extreme values while maintaining meaningful differences
+    desperation_multiplier = 1 + (lambd * 0.5)  # 0.5 scaling factor
+    
+    return base_utility * desperation_multiplier
 
 def SV_relative_desp_RB(gamma, lambd, starting_wealth, p, beta, alpha, reward_rb, cost_rb):
     """
@@ -132,32 +136,12 @@ def SV_relative_desp_RB(gamma, lambd, starting_wealth, p, beta, alpha, reward_rb
     float: Adjusted utility function value.
     """
 
-    # Adjust gamma based on relative deprivation
-    SV = (prelec(p=p, beta=beta, alpha=alpha) * desperation_utility_function(starting_wealth=reward_rb + starting_wealth, gamma=gamma, lambd=lambd)) + np.negative(- \
-                        ((1 - prelec(p=p, beta=beta, alpha=alpha)) * desperation_utility_function(starting_wealth=starting_wealth - cost_rb, gamma=gamma, lambd=lambd))  )
+    w_p = prelec(beta, alpha, p)
     
-    return SV
-
-# Softmax function
-def softmax(SV_rule_breaking, SV_following_rules):
-    """Compute the softmax of vector SVs."""
-    SVs = np.array([SV_rule_breaking, SV_following_rules])  # Ensure SVs is a numpy array
-
-    # Check for NaN or inf values
-    if np.isnan(SVs).any():
-        raise ValueError("Input contains NaN values.")
-    if np.isinf(SVs).any():
-        raise ValueError("Input contains infinity values.")
-
-    stable_SVs = SVs - SVs.max(axis=0)  # Subtract the max value for numerical stability, preventing overflow in exp
-    e_SVs = np.exp(stable_SVs)  # Exponentiate the SVs
-
-    sum_exp_SVs = e_SVs.sum(axis=0)
-    # Prevent division by zero
-    if sum_exp_SVs == 0:
-        return np.zeros_like(SVs)
+    u_success = desperation_utility_function(lambd, gamma, starting_wealth + reward_rb)
+    u_failure = desperation_utility_function(lambd, gamma, starting_wealth - cost_rb)
     
-    return e_SVs / sum_exp_SVs
+    return w_p * u_success - (1 - w_p) * u_failure
 
 def bounded_softmax(SV_rb, SV_rf, tau=3, theta=1.5):
     """
@@ -182,27 +166,8 @@ def bounded_softmax(SV_rb, SV_rf, tau=3, theta=1.5):
         [P(rule-break), P(rule-follow)]
     """
     delta = (SV_rb - SV_rf - tau) / theta
-    p_rb = 1 / (1 + np.exp(-delta))  # logistic transform
+    # Prevent overflow in exp
+    delta = np.clip(delta, -500, 500)
+    p_rb = 1 / (1 + np.exp(-delta))
     return [p_rb, 1 - p_rb]
-
-# Softmax function
-def softmax(SV_rule_breaking, SV_following_rules):
-    """Compute the softmax of vector SVs."""
-    SVs = np.array([SV_rule_breaking, SV_following_rules])  # Ensure SVs is a numpy array
-
-    # Check for NaN or inf values
-    if np.isnan(SVs).any():
-        raise ValueError("Input contains NaN values.")
-    if np.isinf(SVs).any():
-        raise ValueError("Input contains infinity values.")
-
-    stable_SVs = SVs - SVs.max(axis=0)  # Subtract the max value for numerical stability, preventing overflow in exp
-    e_SVs = np.exp(stable_SVs)  # Exponentiate the SVs
-
-    sum_exp_SVs = e_SVs.sum(axis=0)
-    # Prevent division by zero
-    if sum_exp_SVs == 0:
-        return np.zeros_like(SVs)
-    
-    return e_SVs / sum_exp_SVs
 

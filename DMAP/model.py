@@ -1,76 +1,103 @@
+import mesa
 from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.space import SingleGrid
 import numpy as np
+from agents import individual
 
-from .agents import decision_maker
+# --- GINI COEFFICIENT (Handles Negative Wealth) ---
+def gini_coefficient_with_negatives(model):
+    """
+    Calculates the Gini coefficient using the Chen (1982) formula, 
+    which is robust to negative values (debt).
+    """
+    # Create list from AgentSet
+    wealths = np.array([a.wealth for a in model.agents])
+    n = len(wealths)
+    if n == 0: return 0
+
+    # Sort wealth for the calculation
+    wealths_sorted = np.sort(wealths)
+    
+    # Numerator: Sum of absolute differences (Gini mean difference)
+    # Calculated efficiently using dot product
+    index = np.arange(1, n + 1)
+    numerator = 2 * np.sum((2 * index - n - 1) * wealths_sorted)
+    
+    # Denominator: n^2 * mean(abs(x))
+    # Chen's correction normalizes by the sum of absolute values
+    denominator = n * np.sum(np.abs(wealths))
+    
+    if denominator == 0: return 0
+    
+    return numerator / denominator
 
 def crime_proportion(model):
     agent_crimes = [agent.decision for agent in model.agents]
-    n = model.width * model.height  # Total number of agents in the grid
-    proportion = (sum(agent_crimes) ) / n
-    return proportion
+    n = model.width * model.height 
+    return sum(agent_crimes) / n
 
-def gini_coefficient(model):
-    """Calculate the Gini coefficient for the wealth distribution of agents in the model."""
+def average_wealth(model):
     agent_wealths = [agent.wealth for agent in model.agents]
-    n = len(agent_wealths)
-    if n == 0:
-        return 0  # Avoid division by zero if there are no agents
-    sorted_wealths = np.sort(agent_wealths)
-    cumulative_wealth = np.cumsum(sorted_wealths)
-    total_wealth = cumulative_wealth[-1]
-    
-    # Gini coefficient formula
-    gini = (n + 1 - 2 * np.sum(cumulative_wealth) / total_wealth) / n
-    return gini
+    return np.mean(agent_wealths) if len(agent_wealths) > 0 else 0
 
 class rel_DMAP_model(Model):
-    """A model with a number of decision makers."""
-    def __init__(self, width, height, lambd, gamma, reward_rb, reward_rf, cost_rb, min_start_wealth, p, 
-                 beta_loc, beta_scale, alpha_loc, alpha_scale, num_neighbors, income_rank_threshold):
-        super().__init__()
+    def __init__(self, lambd=0.2, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250, 
+                 beta_loc=1, beta_scale=0.5, alpha_loc=1, alpha_scale=0.5, 
+                 min_start_wealth=100, p=0.8, width=100, height=100, 
+                 num_neighbors=20, income_rank_threshold=0.05, seed=None):
+        
+        super().__init__(seed=seed)
         self.width = width
         self.height = height
         self.grid = SingleGrid(width, height, torus=True)
+        self.agents.shuffle_do("step")
 
+        
+        # Save params
         self.lambd = lambd
         self.gamma = gamma
         self.reward_rb = reward_rb
         self.reward_rf = reward_rf
         self.cost_rb = cost_rb
+        self.min_start_wealth = min_start_wealth
         self.p = p
+        self.beta_loc = beta_loc
+        self.beta_scale = beta_scale
+        self.alpha_loc = alpha_loc
+        self.alpha_scale = alpha_scale
+        self.num_neighbors = num_neighbors
+        self.income_rank_threshold = income_rank_threshold
 
-        self.desperate_state = 0  # Initialize desperate state to 0 (not desperate)
-        self.decision = 0  # Initialize decision to 0 (follow rules)
-        self.caught = False  # Initialize caught state to False
-        self.income_rank = 0  # Initialize income rank to 0
-        self.rb_choice = 0  # Initialize rule-breaking choice to 0 (follow rules)
-
-        # Create agents and place them on the grid
+        # Create agents
         for _, pos in self.grid.coord_iter():
-            # Create a new agent at the current position
             agent = individual(
-                model=self, lambd=self.lambd, gamma=self.gamma, reward_rb=self.reward_rb,
-                reward_rf=self.reward_rf, cost_rb=self.cost_rb, min_start_wealth=min_start_wealth,
-                p=self.p, beta_loc=beta_loc, beta_scale=beta_scale, alpha_loc=alpha_loc, 
-                alpha_scale=alpha_scale, num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
-            # Add the agent to the grid at the current position
+                model=self, lambd=lambd, gamma=gamma, reward_rb=reward_rb,
+                reward_rf=reward_rf, cost_rb=cost_rb, min_start_wealth=min_start_wealth,
+                p=p, beta_loc=beta_loc, beta_scale=beta_scale, 
+                alpha_loc=alpha_loc, alpha_scale=alpha_scale, 
+                num_neighbors=num_neighbors, income_rank_threshold=income_rank_threshold)
             self.grid.place_agent(agent, pos)
 
-    
+        # DATA COLLECTOR 
         self.datacollector = mesa.DataCollector(
-            model_reporters={"Proportion crime": crime_proportion},
-            agent_reporters={ "Wealth Start": lambda a: getattr(a, "wealth_start", a.wealth), "Wealth End": 
-                             lambda a: getattr(a, "wealth_end", a.wealth), "income rank":"income_rank", 
-                             "desperate_state": "desperate_state", "uncert_aver": "beta", "uncert_insensitive": "alpha",
-                             "Rule-breaking choice": "decision", "Caught": "caught", "SV_rule_break": "SV_rule_break", 
-                             "SV_follow_rules": "SV_follow_rules"},
-                             tables = {"table": ["step", "agent_id", "decision", "wealth" ]  }
-            )
+            model_reporters={
+                "Proportion crime": crime_proportion,
+                "Gini Coefficient": gini_coefficient_with_negatives,
+                "Average Wealth": average_wealth
+            },
+            agent_reporters={
+                "Wealth": "wealth",
+                "Decision": "decision",
+                "Rank": "income_rank",
+                "Desperate": "desperate_state",
+                "Position": "pos", 
+                "Caught": "caught"
+            }
+        )
         self.running = True
         self.datacollector.collect(self)
-    
+
     def step(self):
         self.agents.do("step")
         self.datacollector.collect(self)

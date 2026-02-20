@@ -1,315 +1,176 @@
-import mesa
-import pandas as pd
-import numpy as np
-from scipy.stats import bernoulli, t
-import matplotlib.pyplot as plt
-import seaborn as sns
-import cognitive_functions as cf
-from model import rel_DMAP_model
-from agents import individual
-import itertools
-from datetime import datetime
+import sys
 import os
+import csv
+import gc
+import itertools
+import time
+from multiprocessing import Pool, cpu_count
+from datetime import datetime
 
-# Create output directory with timestamp
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_dir = f"batch_results_{timestamp}"
-os.makedirs(output_dir, exist_ok=True)
+# Import your original model
+from model import rel_DMAP_model
 
-print("="*60)
-print("MESA 3.3.0 BATCH RUN - PARAMETER SWEEP")
-print("="*60)
-print(f"Output directory: {output_dir}")
-print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print("="*60)
+# --- CONFIGURATION ---
+GRID_WIDTH = 100
+GRID_HEIGHT = 100
+MAX_STEPS = 25
+N_REPLICATIONS = 100
 
-# Define parameter ranges
-# Beta_loc: Optimism/pessimism parameter (ranges from pessimistic to optimistic)
-beta_loc_values = [0.5, 1.0, 1.5, 2.0]  # Low to High optimism
+# Use fewer cores per node to prevent Memory Crash (OOM)
+SAFE_CORE_LIMIT = 24 
 
-# Alpha_loc: Likelihood sensitivity parameter (ranges from insensitive to sensitive)
-alpha_loc_values = [0.5, 1.0, 1.5, 2.0]  # Low to High sensitivity
+# Parameter Sweep Values
+BETA_LOC_VALUES = [-1, 0, 1]
+ALPHA_LOC_VALUES = [0.5, 1, 2]
+THRESHOLD_VALUES = [0.05, 0.2, 0.35, 0.5, 0.65]
 
-# Income_rank_threshold: Desperation threshold (ranges from lenient to strict)
-income_rank_threshold_values = [-0.3, -0.1, 0.1, 0.3]  # Low to High threshold
+# Output setup
+BASE_OUTPUT_FOLDER = "results"
+# We remove the timestamp from the folder name so all Array Jobs write to the same place
+RUN_FOLDER = os.path.join(BASE_OUTPUT_FOLDER, "final_batch_run")
 
-# Fixed parameters (constant across all runs)
-fixed_params = {
-    'lambd': 0.1,
-    'gamma': 0.3,
-    'reward_rb': 50,
-    'reward_rf': 30,
-    'cost_rb': 250,
-    'beta_scale': 0.5,
-    'alpha_scale': 0.5,
-    'min_start_wealth': 100,
-    'p': 0.8,
-    'width': 40,
-    'height': 40,
-    'num_neighbors': 20
-}
+class OptimizedModel(rel_DMAP_model):
+    """
+    Overrides the step() function to:
+    1. Disable the internal DataCollector (saves RAM).
+    2. Use the modern Mesa agent scheduler.
+    """
+    def step(self):
+        self.agents.shuffle_do("step")
 
-# Number of steps per simulation
-n_steps = 30
+def get_header():
+    return [
+        "ReplicationID", "Step", "AgentID", 
+        "Wealth", "Decision", "Rank", "Desperate", 
+        "Position", "Caught",
+        "Beta_Loc", "Alpha_Loc", "Threshold"
+    ]
 
-# Number of replications per parameter combination
-n_replications = 3
+def run_simulation_worker(args):
+    """
+    Worker function. Runs one simulation, extracts data manually.
+    """
+    rep_id, beta, alpha, thresh = args
+    
+    # 1. Deterministic Seeding
+    seed_base = int(abs(beta)*100 + alpha*10 + thresh*1000)
+    current_seed = 12345 + rep_id + seed_base
+    
+    # 2. Initialize Model
+    model = OptimizedModel(
+        lambd=0.2, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250, 
+        beta_loc=beta, alpha_loc=alpha, income_rank_threshold=thresh,
+        beta_scale=0.5, alpha_scale=0.5, 
+        min_start_wealth=100, p=0.8, width=GRID_WIDTH, height=GRID_HEIGHT, 
+        num_neighbors=20,
+        seed=current_seed
+    )
+    
+    # 3. Manual Data Extraction
+    all_rows = []
+    
+    try:
+        for step in range(MAX_STEPS):
+            model.step() 
+            
+            step_rows = [
+                [
+                    rep_id, step, agent.unique_id,
+                    agent.wealth, agent.decision, agent.income_rank, 
+                    int(agent.desperate_state), 
+                    str(agent.pos), 
+                    int(agent.caught),
+                    beta, alpha, thresh
+                ]
+                for agent in model.agents
+            ]
+            all_rows.extend(step_rows)
+            
+    finally:
+        del model
+        gc.collect() 
+    
+    return all_rows
 
-print("\nParameter ranges:")
-print(f"  beta_loc (optimism): {beta_loc_values}")
-print(f"  alpha_loc (sensitivity): {alpha_loc_values}")
-print(f"  income_rank_threshold: {income_rank_threshold_values}")
-print(f"\nFixed parameters:")
-for key, value in fixed_params.items():
-    print(f"  {key}: {value}")
-print(f"\nSteps per simulation: {n_steps}")
-print(f"Replications per condition: {n_replications}")
+if __name__ == '__main__':
+    # Force unbuffered output
+    sys.stdout.reconfigure(line_buffering=True)
+    os.makedirs(RUN_FOLDER, exist_ok=True)
+    
+    # 1. Generate ALL 45 Combinations
+    all_combinations = list(itertools.product(
+        BETA_LOC_VALUES, ALPHA_LOC_VALUES, THRESHOLD_VALUES
+    ))
+    
+    # --- 2. ARRAY JOB LOGIC ---
+    # Check if we are running inside a SLURM Array Job
+    task_id = os.environ.get('SLURM_ARRAY_TASK_ID')
 
-# Calculate total number of simulations
-total_conditions = len(beta_loc_values) * len(alpha_loc_values) * len(income_rank_threshold_values)
-total_simulations = total_conditions * n_replications
-print(f"\nTotal parameter combinations: {total_conditions}")
-print(f"Total simulations: {total_simulations}")
-print("="*60)
-
-# Create all parameter combinations
-param_combinations = list(itertools.product(
-    beta_loc_values,
-    alpha_loc_values,
-    income_rank_threshold_values
-))
-
-# Initialize lists to store results
-all_model_data = []
-all_agent_data = []
-all_table_data = []
-
-# Run simulations
-simulation_count = 0
-for beta_loc, alpha_loc, income_rank_threshold in param_combinations:
-    for replication in range(n_replications):
-        simulation_count += 1
+    if task_id is not None:
+        # We are in an Array Job!
+        # SLURM indexes usually start at 1, Python starts at 0.
+        idx = int(task_id) - 1
         
-        print(f"\n[{simulation_count}/{total_simulations}] Running simulation:")
-        print(f"  beta_loc={beta_loc}, alpha_loc={alpha_loc}, threshold={income_rank_threshold}, rep={replication+1}")
+        if 0 <= idx < len(all_combinations):
+            # Pick ONLY the combination for this specific job
+            my_combinations = [all_combinations[idx]]
+            print(f"SLURM ARRAY MODE: Task ID {task_id}")
+            print(f"Processing ONLY Condition {task_id} of {len(all_combinations)}")
+        else:
+            print(f"Error: Task ID {task_id} is out of range for {len(all_combinations)} conditions.")
+            sys.exit(1)
+    else:
+        # Not in an array job (running locally or single testing)
+        print("STANDARD MODE: Running ALL conditions sequentially.")
+        my_combinations = all_combinations
+
+    # --- 3. CORE DETECTION ---
+    try:
+        slurm_cpus = int(os.environ.get('SLURM_CPUS_PER_TASK', 0))
+    except (ValueError, TypeError):
+        slurm_cpus = 0
+
+    if slurm_cpus > 0:
+        n_cores = min(slurm_cpus, SAFE_CORE_LIMIT)
+    else:
+        n_cores = min(max(1, cpu_count() - 1), SAFE_CORE_LIMIT)
+    
+    print("="*60)
+    print(f"Running on {n_cores} cores.")
+    print("="*60)
+    
+    # --- 4. RUN LOOP ---
+    for i, (beta, alpha, thresh) in enumerate(my_combinations):
         
-        # Create model with current parameters
-        model = rel_DMAP_model(
-            beta_loc=beta_loc,
-            alpha_loc=alpha_loc,
-            income_rank_threshold=income_rank_threshold,
-            **fixed_params
-        )
+        # NOTE: If in Array mode, 'i' is 0, but we want the REAL index for file naming
+        # We find the real index from the master list
+        real_index = all_combinations.index((beta, alpha, thresh)) + 1
         
-        # Run simulation
-        for step in range(n_steps):
-            model.step()
-            if (step + 1) % 10 == 0:
-                print(f"    Step {step + 1}/{n_steps}")
+        print(f"Starting Condition {real_index}: Beta={beta}, Alpha={alpha}, Thresh={thresh}...", flush=True)
         
-        # Collect data
-        model_df = model.datacollector.get_model_vars_dataframe()
-        agent_df = model.datacollector.get_agent_vars_dataframe()
-        table_df = model.datacollector.get_table_dataframe("table")
+        safe_beta = str(beta).replace("-", "neg")
+        filename = f"cond_{real_index}_beta_{safe_beta}_alpha_{alpha}_thresh_{thresh}.csv"
+        filepath = os.path.join(RUN_FOLDER, filename)
         
-        # Add parameter information to dataframes
-        model_df['beta_loc'] = beta_loc
-        model_df['alpha_loc'] = alpha_loc
-        model_df['income_rank_threshold'] = income_rank_threshold
-        model_df['replication'] = replication
-        model_df['simulation_id'] = simulation_count
+        tasks = [(r, beta, alpha, thresh) for r in range(N_REPLICATIONS)]
         
-        agent_df['beta_loc'] = beta_loc
-        agent_df['alpha_loc'] = alpha_loc
-        agent_df['income_rank_threshold'] = income_rank_threshold
-        agent_df['replication'] = replication
-        agent_df['simulation_id'] = simulation_count
-        
-        table_df = table_df.reset_index()
-        table_df['beta_loc'] = beta_loc
-        table_df['alpha_loc'] = alpha_loc
-        table_df['income_rank_threshold'] = income_rank_threshold
-        table_df['replication'] = replication
-        table_df['simulation_id'] = simulation_count
-        
-        # Append to lists
-        all_model_data.append(model_df)
-        all_agent_data.append(agent_df)
-        all_table_data.append(table_df)
-        
-        # Print summary statistics for this run
-        final_crime = model_df['Proportion crime'].iloc[-1]
-        final_gini = model_df['Gini'].iloc[-1]
-        print(f"    Final crime proportion: {final_crime:.3f}")
-        print(f"    Final Gini coefficient: {final_gini:.3f}")
+        with open(filepath, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(get_header())
+            f.flush()
+            
+            with Pool(processes=n_cores, maxtasksperchild=1) as pool:
+                iterator = pool.imap_unordered(run_simulation_worker, tasks)
+                
+                count = 0
+                for rows in iterator:
+                    writer.writerows(rows)
+                    count += 1
+                    if count % 10 == 0:
+                        f.flush()
+                        print(f"   [Cond {real_index}] Processed {count}/{N_REPLICATIONS} runs...", flush=True)
 
-print("\n" + "="*60)
-print("COMBINING RESULTS")
-print("="*60)
+        print(f"   -> Finished Condition {real_index}. File: {filename}\n", flush=True)
+        gc.collect()
 
-# Combine all results
-combined_model_df = pd.concat(all_model_data, ignore_index=True)
-combined_agent_df = pd.concat(all_agent_data, ignore_index=True)
-combined_table_df = pd.concat(all_table_data, ignore_index=True)
-
-print(f"Combined model data shape: {combined_model_df.shape}")
-print(f"Combined agent data shape: {combined_agent_df.shape}")
-print(f"Combined table data shape: {combined_table_df.shape}")
-
-# Save combined results
-print("\nSaving results...")
-combined_model_df.to_csv(f"{output_dir}/batch_model_data.csv", index=True)
-combined_agent_df.to_csv(f"{output_dir}/batch_agent_data.csv", index=True)
-combined_table_df.to_csv(f"{output_dir}/batch_table_data.csv", index=False)
-
-print(f"  Saved: {output_dir}/batch_model_data.csv")
-print(f"  Saved: {output_dir}/batch_agent_data.csv")
-print(f"  Saved: {output_dir}/batch_table_data.csv")
-
-# Create summary statistics
-print("\n" + "="*60)
-print("GENERATING SUMMARY STATISTICS")
-print("="*60)
-
-# Calculate summary statistics by parameter combination
-summary_stats = combined_model_df.groupby(['beta_loc', 'alpha_loc', 'income_rank_threshold']).agg({
-    'Proportion crime': ['mean', 'std', 'min', 'max'],
-    'Gini': ['mean', 'std', 'min', 'max']
-}).round(4)
-
-summary_stats.columns = ['_'.join(col).strip() for col in summary_stats.columns.values]
-summary_stats = summary_stats.reset_index()
-
-# Save summary statistics
-summary_stats.to_csv(f"{output_dir}/summary_statistics.csv", index=False)
-print(f"  Saved: {output_dir}/summary_statistics.csv")
-
-# Display summary statistics
-print("\nSummary Statistics (averaged across replications):")
-print(summary_stats.to_string())
-
-# Create parameter metadata file
-metadata = {
-    'timestamp': timestamp,
-    'n_steps': n_steps,
-    'n_replications': n_replications,
-    'total_simulations': total_simulations,
-    'beta_loc_values': beta_loc_values,
-    'alpha_loc_values': alpha_loc_values,
-    'income_rank_threshold_values': income_rank_threshold_values,
-    'fixed_parameters': fixed_params
-}
-
-metadata_df = pd.DataFrame([metadata])
-metadata_df.to_csv(f"{output_dir}/metadata.csv", index=False)
-print(f"  Saved: {output_dir}/metadata.csv")
-
-# Generate some basic visualizations
-print("\n" + "="*60)
-print("GENERATING VISUALIZATIONS")
-print("="*60)
-
-try:
-    # Calculate mean values for final step
-    final_step_data = combined_model_df[combined_model_df.index.get_level_values(0) == n_steps - 1]
-    
-    # Plot 1: Crime proportion by parameters
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    
-    # By beta_loc
-    grouped = final_step_data.groupby('beta_loc')['Proportion crime'].agg(['mean', 'std'])
-    axes[0].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='o', capsize=5)
-    axes[0].set_xlabel('Beta Loc (Optimism)', fontsize=12)
-    axes[0].set_ylabel('Crime Proportion', fontsize=12)
-    axes[0].set_title('Crime Proportion by Optimism Level', fontsize=14)
-    axes[0].grid(True, alpha=0.3)
-    
-    # By alpha_loc
-    grouped = final_step_data.groupby('alpha_loc')['Proportion crime'].agg(['mean', 'std'])
-    axes[1].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='o', capsize=5, color='orange')
-    axes[1].set_xlabel('Alpha Loc (Sensitivity)', fontsize=12)
-    axes[1].set_ylabel('Crime Proportion', fontsize=12)
-    axes[1].set_title('Crime Proportion by Likelihood Sensitivity', fontsize=14)
-    axes[1].grid(True, alpha=0.3)
-    
-    # By income_rank_threshold
-    grouped = final_step_data.groupby('income_rank_threshold')['Proportion crime'].agg(['mean', 'std'])
-    axes[2].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='o', capsize=5, color='green')
-    axes[2].set_xlabel('Income Rank Threshold', fontsize=12)
-    axes[2].set_ylabel('Crime Proportion', fontsize=12)
-    axes[2].set_title('Crime Proportion by Desperation Threshold', fontsize=14)
-    axes[2].grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/crime_proportion_by_parameters.png", dpi=300, bbox_inches='tight')
-    print(f"  Saved: {output_dir}/crime_proportion_by_parameters.png")
-    plt.close()
-    
-    # Plot 2: Gini coefficient by parameters
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    
-    # By beta_loc
-    grouped = final_step_data.groupby('beta_loc')['Gini'].agg(['mean', 'std'])
-    axes[0].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='s', capsize=5)
-    axes[0].set_xlabel('Beta Loc (Optimism)', fontsize=12)
-    axes[0].set_ylabel('Gini Coefficient', fontsize=12)
-    axes[0].set_title('Wealth Inequality by Optimism Level', fontsize=14)
-    axes[0].grid(True, alpha=0.3)
-    
-    # By alpha_loc
-    grouped = final_step_data.groupby('alpha_loc')['Gini'].agg(['mean', 'std'])
-    axes[1].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='s', capsize=5, color='orange')
-    axes[1].set_xlabel('Alpha Loc (Sensitivity)', fontsize=12)
-    axes[1].set_ylabel('Gini Coefficient', fontsize=12)
-    axes[1].set_title('Wealth Inequality by Likelihood Sensitivity', fontsize=14)
-    axes[1].grid(True, alpha=0.3)
-    
-    # By income_rank_threshold
-    grouped = final_step_data.groupby('income_rank_threshold')['Gini'].agg(['mean', 'std'])
-    axes[2].errorbar(grouped.index, grouped['mean'], yerr=grouped['std'], marker='s', capsize=5, color='green')
-    axes[2].set_xlabel('Income Rank Threshold', fontsize=12)
-    axes[2].set_ylabel('Gini Coefficient', fontsize=12)
-    axes[2].set_title('Wealth Inequality by Desperation Threshold', fontsize=14)
-    axes[2].grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/gini_by_parameters.png", dpi=300, bbox_inches='tight')
-    print(f"  Saved: {output_dir}/gini_by_parameters.png")
-    plt.close()
-    
-    # Plot 3: Heatmap of crime proportion
-    pivot_data = final_step_data.groupby(['beta_loc', 'alpha_loc'])['Proportion crime'].mean().reset_index()
-    pivot_table = pivot_data.pivot(index='alpha_loc', columns='beta_loc', values='Proportion crime')
-    
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(pivot_table, annot=True, fmt='.3f', cmap='YlOrRd', cbar_kws={'label': 'Crime Proportion'})
-    plt.xlabel('Beta Loc (Optimism)', fontsize=12)
-    plt.ylabel('Alpha Loc (Sensitivity)', fontsize=12)
-    plt.title('Crime Proportion Heatmap: Optimism × Sensitivity', fontsize=14)
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/crime_heatmap_beta_alpha.png", dpi=300, bbox_inches='tight')
-    print(f"  Saved: {output_dir}/crime_heatmap_beta_alpha.png")
-    plt.close()
-    
-    print("Visualizations complete!")
-    
-except Exception as e:
-    print(f"Warning: Could not generate all visualizations: {e}")
-
-# Print final summary
-print("\n" + "="*60)
-print("BATCH RUN COMPLETE")
-print("="*60)
-print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Total simulations completed: {total_simulations}")
-print(f"Output directory: {output_dir}")
-print("\nOutput files:")
-print(f"  - batch_model_data.csv ({combined_model_df.shape[0]} rows)")
-print(f"  - batch_agent_data.csv ({combined_agent_df.shape[0]} rows)")
-print(f"  - batch_table_data.csv ({combined_table_df.shape[0]} rows)")
-print(f"  - summary_statistics.csv")
-print(f"  - metadata.csv")
-print(f"  - crime_proportion_by_parameters.png")
-print(f"  - gini_by_parameters.png")
-print(f"  - crime_heatmap_beta_alpha.png")
-print("="*60)
+    print("JOB COMPLETE")

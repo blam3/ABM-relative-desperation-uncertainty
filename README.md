@@ -1,8 +1,8 @@
-# Decision-making under Ambiguity and Poverty (DMAP) Model 
+# Decision-making under Uncertainty and Relative Desperation (DMURD) Model 
 
 ## Summary
 
-This is the same Decision-making under Ambiguity and Poverty (DMAP) Model.
+This is the same Decision-making under Uncertainty and Relative Desperation (DMURD) Model.
 
 A model of agents deciding how to accumulate wealth. All agents start with varying amounts of money. Every step, each agent must decide between two options:
 

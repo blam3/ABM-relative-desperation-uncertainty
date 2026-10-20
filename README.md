@@ -34,10 +34,7 @@ CLUSTER.md                 how to run the sweep on Yale's Bouchet cluster
 PARAMETERS.md              every parameter value and the reason for it
 CHANGELOG.md               what changed, when, and why
 pilot/                     September 2026 pilot: code, raw results, figures
-legacy/june-2026-hpc/      the code behind the June 2026 manuscript results
 docs/                      manuscript-side documents
-notebooks/                 current diagnostics
-deprecated/                superseded code, notebooks, and outputs (kept for reference)
 ```
 
 ## Install

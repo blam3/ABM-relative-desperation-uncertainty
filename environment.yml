@@ -1,0 +1,16 @@
+# Conda environment for the DMURD model.
+# On Bouchet:  module load miniconda && conda env create -f environment.yml
+# (create it from a compute node, not the login node; see CLUSTER.md)
+name: dmurd
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.26
+  - scipy>=1.11
+  - pandas>=2.0
+  - matplotlib>=3.8
+  - statsmodels>=0.14
+  - pip
+  - pip:
+      - mesa>=3.1

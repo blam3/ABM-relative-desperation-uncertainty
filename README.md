@@ -2,8 +2,6 @@
 
 ## Summary
 
-This is the same Decision-making under Uncertainty and Relative Desperation (DMURD) Model.
-
 A model of agents deciding how to accumulate wealth. All agents start with varying amounts of money. Every step, each agent must decide between two options:
 
 1) To receive a smaller certain amount of money from following the rules.

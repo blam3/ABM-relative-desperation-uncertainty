@@ -29,12 +29,10 @@ run_summary.py             the replication-level summary every batch script writ
 aggregate_results.py       builds analysis/replication_level.csv and the metamodel
 check_environment.py       preflight check to run before submitting a sweep
 environment.yml            conda environment for the cluster
-slurm/                     Slurm submission scripts for Bouchet
+slurm/                     Slurm submission scripts for the Bouchet high performance computing cluster at Yale University
 CLUSTER.md                 how to run the sweep on Yale's Bouchet cluster
 PARAMETERS.md              every parameter value and the reason for it
 CHANGELOG.md               what changed, when, and why
-pilot/                     September 2026 pilot: code, raw results, figures
-docs/                      manuscript-side documents
 ```
 
 ## Install

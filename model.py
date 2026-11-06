@@ -1,10 +1,9 @@
 """
+
 Mesa model for the DMURD model (revised 2026-09).
 
-The multiplicative desperation mechanism (use_refshift=False) was removed:
-the June 2026 sweep and the manuscript both use the reference-shift mechanism.
-New options are passed through to agents (see agents.py).
 """
+
 import mesa
 from mesa import Model
 from mesa.space import SingleGrid

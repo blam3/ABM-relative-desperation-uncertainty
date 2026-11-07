@@ -207,8 +207,4 @@ identical random streams.
   main sweep has not been repeated at intermediate values (0.3, 0.4), which could
   refine the balance between preserving desperation gap magnitude and monotonicity
   in nu.
-- alpha = 2 describes an uncommon profile; most empirical estimates fall below 1.
-  It is kept so that the design is symmetric on the log scale.
-- No parameter is estimated from offending data. Simulation-based inference
-  ([Cranmer et al., 2020](https://doi.org/10.1073/pnas.1912789117)) is the planned
-  route to calibration.
+

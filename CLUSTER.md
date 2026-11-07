@@ -1,6 +1,5 @@
-# Running the sweep on Bouchet
+# Running the sweep on a computing cluster
 
-Step-by-step for Yale's Bouchet cluster ([YCRC docs](https://docs.ycrc.yale.edu/clusters/bouchet/)).
 Everything below assumes this repository is the working directory.
 
 ## 0. What runs where
@@ -11,8 +10,7 @@ Everything below assumes this repository is the working directory.
 | Output | `$HOME/scratch/dmurd` | 10 TiB per group, **purged after 30 days**, not backed up |
 | Results you keep | copy summaries and `analysis/` to `~/project` | 4 TiB per group, backed up |
 
-Bouchet's filesystems are `/nfs/roberts/home`, `/nfs/roberts/project`, and
-`/nfs/roberts/scratch`. Check what your home directory links to with
+Check what your home directory links to with
 `ls -l $HOME | grep -iE 'scratch|project'`. If the scratch symlink has a different
 name, set it once before submitting:
 
@@ -37,7 +35,7 @@ Step 6 aggregates all four; do not aggregate only the first one.
 If the repository is on GitHub:
 
 ```bash
-ssh netid@bouchet.ycrc.yale.edu
+ssh netid@clustername.edu
 mkdir -p ~/project && cd ~/project
 git clone https://github.com/blam3/ABM-poverty-uncertainty.git dmurd
 cd dmurd
@@ -50,7 +48,7 @@ rsync -avz --progress \
   --exclude '.git' --exclude '.venv' --exclude '__pycache__' \
   --exclude 'deprecated' --exclude 'docs' --exclude 'results' --exclude 'analysis' \
   ~/Documents/GitHub/ABM-poverty-uncertainty/ \
-  netid@bouchet.ycrc.yale.edu:~/project/dmurd/
+  netid@school.edu:~/project/dmurd/
 ```
 
 Then create the log directory once, before any `sbatch`. Slurm opens
@@ -262,13 +260,3 @@ without editing code:
 | Disk quota errors mid-sweep | You are writing to home (125 GiB). Set `DMURD_RESULTS_ROOT` to scratch. |
 | Results differ between runs | Check that `DMURD_ROOT_SEED` did not change and that each task wrote the `Seed` column; seeds come from `SeedSequence([root, condition, rep])`. |
 
-## 10. Partition reference (Bouchet, September 2026)
-
-| Partition | Max time | Notes |
-|---|---|---|
-| `devel` | 6 hours | 4 CPUs per user; use for setup and smoke tests |
-| `day` | 24 hours | 1,500 CPUs per user; the default choice here |
-| `week` | 7 days | 96 CPUs per user |
-| `scavenge` | 24 hours | Preemptable, requeued automatically |
-
-Source: [Bouchet cluster documentation](https://docs.ycrc.yale.edu/clusters/bouchet/).

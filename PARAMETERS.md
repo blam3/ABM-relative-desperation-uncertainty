@@ -5,9 +5,7 @@ levels of uncertainty aversion now correspond to. Symbols follow the manuscript.
 Values are set in `batch_run_hpc.py` (`MODEL_OPTIONS`) unless noted.
 
 Last updated 2026-09-29, after the desperation-severity (lambda) sweep and
-recalibration described in `CHANGELOG.md`. Wherever this file and the June 2026
-manuscript disagree, this file describes the code in this repository and the
-manuscript still describes the June sweep.
+recalibration described in `CHANGELOG.md`. 
 
 ## 1. Summary table
 

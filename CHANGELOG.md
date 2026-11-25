@@ -1,3 +1,20 @@
+# Presentation and reproducibility update — 2026-11-25
+
+- Added an installable `requirements.txt`, small seeded CLI demo, optional plot
+  and agent exports, run metadata, scientific boundary checks, and CI.
+- Fixed `run.py` reproducibility: the old entry point supplied only a Mesa seed
+  while NumPy/SciPy agent draws use the global NumPy RNG. The demo now seeds both.
+  This changes the single-run random realization, not the scientific dynamics;
+  it does not retroactively validate any prior sweep. Batch scripts are unchanged.
+- Replaced missing pilot-file links with an explicitly labeled software example.
+  Default `run.py` is now a small demonstration; the previous 100×100/25-step
+  scale is available through explicit flags. Initialization is excluded from the
+  demo plot, since all decisions are zero before the first step.
+- Pin Mesa 3.5.3, checked during this cleanup. Make environment checks portable
+  when CPU affinity is unavailable. No full research sweep was run.
+
+---
+
 # Changelog
 
 Reverse-chronological. Entries before 2026-05-15 were not kept in this repository;

@@ -22,13 +22,14 @@ def main():
     print(f"scipy       {scipy.__version__}")
     print(f"mesa        {mesa.__version__}")
     if int(mesa.__version__.split(".")[0]) < 3:
-        sys.exit("Mesa 3.x is required (the model uses mesa.discrete_space and shuffle_do).")
+        sys.exit("Mesa 3.x is required (the model uses FixedAgent and shuffle_do).")
     for optional in ("pandas", "matplotlib", "statsmodels"):
         try:
             print(f"{optional:<12}{__import__(optional).__version__}")
         except ImportError:
             print(f"{optional:<12}not installed (needed only for the analysis scripts)")
-    print(f"cpus visible to this process: {len(os.sched_getaffinity(0))}")
+    cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+    print(f"cpus visible to this process: {cpu_count}")
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from model import rel_DMAP_model

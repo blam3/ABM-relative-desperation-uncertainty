@@ -1,119 +1,139 @@
-# Relative desperation and uncertainty: an agent-based model of property crime
+# Relative Desperation and Uncertainty
 
-An agent-based model of offending in which the decision to steal depends on two
-things: where an agent stands relative to its neighbors, and how it evaluates
-uncertain outcomes. The model combines a relative desperation threshold
-(relative deprivation theory) with Prelec's probability weighting function
-(behavioral economics) inside a spatial population of 10,000 agents.
+**An agent-based model exploring behavioral mechanisms of property crime.**
 
-Each step, every agent chooses between law-abiding behavior, which pays a certain
-wage, and offending, which pays more when it succeeds and costs a large penalty
-when it does not. Offending has a negative expected payoff by design, so any
-offending the model produces comes from how agents weigh the odds and from how far
-behind their neighbors they have fallen.
+How might a person's position relative to neighbors interact with judgments of
+uncertain outcomes? This model combines relative deprivation, probability
+weighting, and stochastic choices in a spatial population. It is a mechanism
+exploration, not a calibrated forecast of real-world offending.
 
-This repository accompanies a manuscript under preparation for *Social
-Psychological and Personality Science*.
+**Methods:** Python · Mesa · behavioral decision theory · agent-based modeling ·
+replicated simulation · sensitivity analysis · Slurm
 
-## Layout
+![Small seeded software demonstration](examples/demo/trajectories.png)
 
-```
-cognitive_functions.py     utility, probability weighting, choice rule
-agents.py                  agent: comparison group, desperation, decision, wealth update
-model.py                   Mesa model: grid, scheduling, data collection
-run.py                     one validation run -> model_data.csv, agent_data.csv
-batch_run_hpc.py           main sweep: 3 beta x 3 alpha x 5 thresholds x 100 reps
-batch_run_sensitivity.py   softmax robustness and a 50-step convergence check
-batch_run_inequality.py    exogenous inequality and an alternative desperation rule
-run_summary.py             the replication-level summary every batch script writes
-aggregate_results.py       builds analysis/replication_level.csv and the metamodel
-check_environment.py       preflight check to run before submitting a sweep
-environment.yml            conda environment for the cluster
-slurm/                     Slurm submission scripts for the high performance computing cluster
-CLUSTER.md                 how to run the sweep on the computing cluster
-PARAMETERS.md              every parameter value and the reason for it
-CHANGELOG.md               what changed, when, and why
-```
+**Status:** simulation code and cluster workflows are available. The figure is a
+small single-seed software demonstration; full research-sweep results are not
+included here. [Example data and provenance](examples/demo/README.md).
 
-## Install
+## Run a small example
+
+Python **3.11 or 3.12** is used in CI. From a terminal:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/blam3/ABM-relative-desperation-uncertainty.git
+cd ABM-relative-desperation-uncertainty
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+python run.py --plot
 ```
 
-## Run
+On Windows, activate with `.venv\Scripts\activate`. The default run uses a
+20×20 grid and 10 steps. Files appear in `outputs/demo/`:
+
+- `model_data.csv`: offending proportion, mean wealth, P90–P10 wealth gap
+- `metadata.json`: seed, run size, key parameters, and package versions
+- `trajectories.png`: demonstration plot, excluding initialization
+
+Add `--agent-data` for per-agent output. **Step 0 is initialization**, when all
+choice indicators start at zero. Reproducing the earlier single-run scale is
+explicit:
 
 ```bash
-python check_environment.py      # versions, a small run, seed reproducibility
-python run.py                    # one 100 x 100 run, 25 steps
-python batch_run_hpc.py          # all 45 conditions locally (slow; use the cluster)
-python batch_run_inequality.py   # exogenous-inequality supplement
+python run.py --width 100 --height 100 --steps 25 --seed 20260918 --out outputs/validation --agent-data
 ```
 
-Results go to `results/` by default, or wherever `DMURD_RESULTS_DIR` points, and
-are not tracked by git.
+The entry point seeds both Mesa and the global NumPy/SciPy random stream.
+Repeatability is checked within the installed environment; identical random
+trajectories across package versions are not guaranteed. Independent processes
+should be used for parallel replications because agent draws use global NumPy.
 
-## Run it on the cluster
+## Model in brief
 
-`CLUSTER.md` is the step-by-step guide for the cluster: transfer, conda
-environment, a five-minute smoke test, then
+1. Agents occupy a toroidal grid and compare wealth with sampled local neighbors.
+2. Relative desperation shifts the reference point used to value outcomes.
+3. Prelec probability weighting transforms the perceived odds of success.
+4. A bounded softmax converts subjective values into stochastic choices.
+5. Outcomes and living costs update wealth; agents update in shuffled order.
+
+Under the default payoffs, offending has a negative expected monetary increment,
+while law-abiding behavior pays a certain wage. Probability weighting, reference
+points, nonlinear utility, **and decision noise** can all influence choices;
+offending is not attributable to one mechanism merely because it occurs.
+
+### Probability-weighting correction
+
+The default is `w(p) = exp(-exp(beta) * (-ln(p))**alpha)`. At **beta = 0 and
+alpha = 1**, weighting is the identity. The demonstration still draws heterogeneous
+beta and alpha, so its population is not a no-distortion control.
+
+The older `prelec_raw` option retains a historical parameterization that can
+produce invalid weights when beta is nonpositive. It is for historical
+comparison only, not the corrected default. See [PARAMETERS.md](PARAMETERS.md)
+and [CHANGELOG.md](CHANGELOG.md) for assumptions and corrections.
+
+## Verification
 
 ```bash
-sbatch slurm/submit_main_sweep.sh     # 45 conditions x 100 replications
-sbatch slurm/submit_sensitivity.sh    # softmax robustness and convergence
-sbatch slurm/submit_inequality.sh     # Goal 3 / H4 supplement
-python aggregate_results.py --results $HOME/scratch/dmurd/final_batch_run_v2 \
-       --out analysis --metamodel
+python -m unittest discover -s tests -v
+python check_environment.py
 ```
 
-Every run writes a replication-level summary row (about 5 MB for the whole sweep);
-the per-agent rows are optional and gzipped (about 26 GB), so they belong on
-scratch.
+Checks cover weighting bounds/identity/monotonicity, same-seed trajectories,
+output invariants, and invalid demo sizes. CI also runs a small plot-producing
+example. These are software/model checks, not empirical validation of the theory.
 
-## The three uncertainty conditions
+## Research-scale workflows
 
-The weighting function is w(p) = exp(-exp(beta) (-ln p)^alpha). With a successful
-theft at p = .80 and alpha = 1:
+The batch scripts vary probability weighting, desperation thresholds, decision
+noise, initial inequality, and alternative desperation rules. They write
+replication-level summaries for analysis. Large per-agent outputs should stay
+outside Git.
 
-| Condition | beta | Weight on a successful theft | Weight on apprehension (objective .20) |
-|---|---|---|---|
-| Uncertainty seeking | -1 | .92 | .08 |
-| No distortion | 0 | .80 | .20 |
-| Uncertainty averse | +1 | .55 | .45 |
-
-`PARAMETERS.md` explains why beta enters as an exponent, what alpha does.
-
-## Pilot runs
-
-`pilot/` holds reduced-scale runs (50 x 50 grid) used to check the corrections
-before committing cluster time. With the June settings the pilot reproduces the
-published results closely; with the corrected code three conclusions change.
-Figures are in `pilot/figures/`:
-
-| Figure | Shows |
+| File | Purpose |
 |---|---|
-| `fig1_weighting_function.png` | Decision weights before and after the fix |
-| `fig2_pilot_validation.png` | Pilot vs. published results, June settings |
-| `fig3_beta_by_alpha.png` | Likelihood insensitivity reverses direction |
-| `fig4_trajectories.png` | Offending levels off while inequality keeps growing |
-| `fig5_exogenous_inequality.png` | Initial inequality raises offending, then conditions converge |
-| `fig6_desperation_gap_curve.png` | Why offending peaks at a moderate wealth gap |
+| `cognitive_functions.py` | Utility, weighting, reference-point valuation, choice rule |
+| `agents.py`, `model.py` | Agent behavior, spatial comparisons, model scheduling |
+| `run.py` | Small seeded CLI example and optional exports |
+| `batch_run_hpc.py` | Main replicated parameter sweep |
+| `batch_run_sensitivity.py`, `batch_run_inequality.py` | Sensitivity designs |
+| `run_summary.py`, `aggregate_results.py` | Replication-level summaries and analysis |
+| `slurm/`, `CLUSTER.md` | Research-cluster submission instructions |
 
-Pilot numbers are previews. Report results from the full sweep.
+See [CLUSTER.md](CLUSTER.md) before running a full sweep. It is tailored to the
+researcher's cluster, not a prerequisite for the local example. The Conda
+alternative is `conda env create -f environment.yml` followed by `conda activate dmurd`.
 
-## Background reading
+## Limitations and next work
 
-- Prelec, D. (1998). The probability weighting function. *Econometrica, 66*(3), 497-527. https://doi.org/10.2307/2998573
-- de Courson, B., & Nettle, D. (2021). Why do inequality and deprivation produce high crime and low trust? *Scientific Reports, 11*, 1937. https://doi.org/10.1038/s41598-020-80897-8
-- Radkani, S., Holton, E., de Courson, B., Saxe, R., & Nettle, D. (2023). Desperation and inequality increase stealing. *Royal Society Open Science, 10*, 221385. https://doi.org/10.1098/rsos.221385
-- Mishra, S., Barclay, P., & Sparks, A. (2017). The relative state model. *Personality and Social Psychology Review, 21*(2), 176-198. https://doi.org/10.1177/1088868316644094
-- Gonzalez-Jimenez, V. (2026). Poverty and biased evaluations of uncertainty: Theory and experimental evidence.
-- Jackson, J. C., Rand, D., Lewis, K., Norton, M. I., & Gray, K. (2017). Agent-based modeling: A guide for social psychologists. *Social Psychological and Personality Science, 8*(4), 387-395. https://doi.org/10.1177/1948550617691100
+This repository explores behavior under specified assumptions, not estimated
+individual risk. The example does not establish prevalence, causal effects of
+inequality, or implications for policing or targeting individuals. Spatial
+comparisons, the desperation rule, asynchronous updating, payoff settings,
+and stochastic choice are substantive modeling assumptions.
 
-## Citation
+Next work is to complete replicated research sweeps, report Monte Carlo
+uncertainty, compare alternative mechanisms, and connect predictions to suitable
+empirical evidence. The local example is intentionally too small to support
+those conclusions. No full sweep was run during the presentation cleanup.
 
-```
-Lam, B. (2026). An agent-based model of relative desperation and uncertainty in
-property crime [Computer software]. https://github.com/blam3/ABM-poverty-uncertainty
-```
+## Background and provenance
+
+Research repository maintained by Brendan Lam. Historical revisions and
+corrections are retained in [CHANGELOG.md](CHANGELOG.md); parameter rationale is
+in [PARAMETERS.md](PARAMETERS.md). AI assistance was used in repository cleanup;
+passing checks does not replace independent scientific review.
+
+Selected background:
+
+- Prelec (1998), [The probability weighting function](https://doi.org/10.2307/2998573).
+- de Courson & Nettle (2021), [Why do inequality and deprivation produce high crime and low trust?](https://doi.org/10.1038/s41598-020-80897-8).
+- Radkani et al. (2023), [Desperation and inequality increase stealing](https://doi.org/10.1098/rsos.221385).
+- Jackson et al. (2017), [Agent-based modeling: A guide for social psychologists](https://doi.org/10.1177/1948550617691100).
+
+If citing this research code, use the current repository URL and identify the
+commit and parameterization:
+
+> Lam, B. Relative desperation and uncertainty: an agent-based model of property
+> crime [Research software]. https://github.com/blam3/ABM-relative-desperation-uncertainty

@@ -10,7 +10,9 @@
   Default `run.py` is now a small demonstration; the previous 100×100/25-step
   scale is available through explicit flags. Initialization is excluded from the
   demo plot, since all decisions are zero before the first step.
-- Pin Mesa 3.5.3, checked during this cleanup. Make environment checks portable
+- Pin Mesa 3.5.3, checked during this cleanup. Mesa requires Python >=3.12;
+  the Conda environment, README, and CI now use Python 3.12 after the initial
+  CI run exposed the unsupported Python 3.11 combination. Make environment checks portable
   when CPU affinity is unavailable. No full research sweep was run.
 
 ---

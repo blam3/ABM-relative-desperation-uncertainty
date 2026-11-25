@@ -1,3 +1,4 @@
+# Requires Python >=3.12 (Mesa requirement).
 # Mesa version verified during the November 2026 presentation cleanup.
 mesa==3.5.3
 numpy>=1.26,<3

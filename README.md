@@ -18,7 +18,7 @@ included here. [Example data and provenance](examples/demo/README.md).
 
 ## Run a small example
 
-Python **3.11 or 3.12** is used in CI. From a terminal:
+Use **Python 3.12**, the version tested in CI. Mesa 3.5.3 requires Python 3.12 or newer. From a terminal:
 
 ```bash
 git clone https://github.com/blam3/ABM-relative-desperation-uncertainty.git

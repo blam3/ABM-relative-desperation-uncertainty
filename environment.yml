@@ -5,7 +5,7 @@ name: dmurd
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.12
   - numpy>=1.26
   - scipy>=1.11
   - pandas>=2.0

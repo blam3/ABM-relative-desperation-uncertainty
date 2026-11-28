@@ -22,7 +22,7 @@ def main():
     print(f"scipy       {scipy.__version__}")
     print(f"mesa        {mesa.__version__}")
     if int(mesa.__version__.split(".")[0]) < 3:
-        sys.exit("Mesa 3.x is required (the model uses FixedAgent and shuffle_do).")
+        sys.exit("Mesa 3.x is required (the model uses mesa.discrete_space and shuffle_do).")
     for optional in ("pandas", "matplotlib", "statsmodels"):
         try:
             print(f"{optional:<12}{__import__(optional).__version__}")

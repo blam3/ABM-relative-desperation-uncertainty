@@ -1,4 +1,36 @@
-# Presentation and reproducibility update — 2026-11-25
+# Changelog
+
+Reverse-chronological. Entries before 2026-05-15 were not kept in this repository;
+the running log from the cluster copy is summarized under "Earlier".
+
+---
+
+## 2026-11-28 - Sync of the cluster working copy with GitHub
+
+Merges the 2026-11-18 cluster work into the 2026-11-25 GitHub version. No model
+dynamics changed: `agents.py`, `cognitive_functions.py`, `run_summary.py`,
+`aggregate_results.py` and `batch_run_inequality.py` were already identical.
+
+- lambda = 0.5 default (entry below) applied to `run.py`'s `simulate()` and its
+  metadata as well; `examples/demo/` regenerated at lambda = 0.5.
+- Environment pinned to the cluster environment that produced the research
+  sweeps: Python 3.11, Mesa 3.3.1 (`environment.yml`, `requirements.txt`, CI).
+  This replaces the 2026-11-25 Python 3.12 / Mesa 3.5.3 pins.
+- Added `batch_run_lambda_sweep.py`, `batch_run_neighbor_sensitivity.py`,
+  `analyze_lambda_sweep.py`, `analyze_for_manuscript.py`,
+  `make_manuscript_figures.py`, `make_supplementary.py`, `notebooks/` and the
+  reproducibility part of `archive/` (June 2026 model code, September 2026 pilot).
+- Removed the lambda = 0.2 Slurm scripts `slurm/submit_main_sweep.sh` and
+  `slurm/submit_sensitivity.sh`; use the `_lambda05` scripts.
+- `submit_main_sweep_lambda05.sh` honours `DMURD_RAW=1` for per-agent rows
+  (default still summaries only).
+- Caveat on the 2026-11-18 entry: the lambda = 0.5 status of the September
+  outputs rests on byte-identical reruns. The summary files themselves do not
+  record lambda.
+
+---
+
+## 2026-11-25 - Presentation and reproducibility update
 
 - Added an installable `requirements.txt`, small seeded CLI demo, optional plot
   and agent exports, run metadata, scientific boundary checks, and CI.
@@ -17,10 +49,30 @@
 
 ---
 
-# Changelog
+## 2026-11-18 - lambda = 0.5 is now the default everywhere
 
-Reverse-chronological. Entries before 2026-05-15 were not kept in this repository;
-the running log from the cluster copy is summarized under "Earlier".
+Checked whether the sensitivity and inequality scripts read `DMURD_LAMBDA`. They do:
+`batch_run_sensitivity.py`, `batch_run_neighbor_sensitivity.py` and
+`batch_run_inequality.py` all copy `batch_run_hpc.MODEL_OPTIONS`, and none overrides
+`lambd`. But `submit_inequality.sh` never set the variable, so the inequality sweep
+ran at the code default of 0.2. The existing inequality results (job 26860827,
+2026-09-20, analyzed in `analysis/inequality_sweep/`) are therefore lambda = 0.2.
+
+- `submit_inequality.sh` now exports `DMURD_LAMBDA=0.5`.
+- Default lambda changed from 0.2 to 0.5 in `batch_run_hpc.py` (`MODEL_OPTIONS`),
+  `model.py` (`rel_DMAP_model`) and `run.py`, so a script that does not set it can
+  no longer fall back to 0.2. `DMURD_LAMBDA=0.2` still overrides.
+- Archived reproductions that relied on the old default now pass `lambd=0.2`
+  explicitly (`archive/pilot-sept-2026/{pilot,traj_pilot,equiv_test}.py`, and the
+  instructions in `archive/june-2026-model/README.md`). `equiv_test.py` still reports
+  the current code identical to the June code under the June settings.
+- `batch_run_lambda_sweep.py` is unaffected: it sets lambda per condition.
+- Reran the three robustness analyses at lambda = 0.5 (jobs 33839586 softmax +
+  50-step convergence, 33839587 comparison-group size; output in
+  `~/scratch/dmurd/rerun-2026-11-18/`). All 93 summary files are identical to the
+  2026-09-29 outputs in `~/scratch/dmurd/*_lambda0.5/` (max absolute difference 0),
+  so those September outputs, and the supplement rebuilt from them on Oct 4, are
+  lambda = 0.5 results.
 
 ---
 

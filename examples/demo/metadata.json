@@ -6,7 +6,7 @@
   "seed": 20260918,
   "initial_row": "Step 0 is initialization; decisions have not yet been made",
   "parameters": {
-    "lambda": 0.2,
+    "lambda": 0.5,
     "gamma": 0.3,
     "p_success": 0.8,
     "beta_loc": 0,
@@ -18,10 +18,10 @@
     "theta_softmax": 1.5
   },
   "versions": {
-    "python": "3.12.14",
-    "numpy": "2.3.5",
-    "scipy": "1.17.0",
-    "pandas": "2.2.3",
-    "mesa": "3.5.3"
+    "python": "3.11.16",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "pandas": "3.0.6",
+    "mesa": "3.3.1"
   }
 }

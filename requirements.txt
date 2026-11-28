@@ -1,8 +1,8 @@
-# Requires Python >=3.12 (Mesa requirement).
-# Mesa version verified during the November 2026 presentation cleanup.
-mesa==3.5.3
+# Python 3.11. Mesa is pinned to the cluster environment that produced the results;
+# the other bounds include its versions (numpy 2.4.6, scipy 1.17.1, pandas 3.0.6).
+mesa==3.3.1
 numpy>=1.26,<3
 scipy>=1.11,<2
-pandas>=2.0,<3
+pandas>=2.0,<4
 matplotlib>=3.8,<4
 statsmodels>=0.14,<1

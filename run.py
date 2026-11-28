@@ -24,7 +24,7 @@ def simulate(width=20, height=20, steps=10, seed=20260918):
         raise ValueError("steps must be positive")
     np.random.seed(seed)
     model = rel_DMAP_model(
-        lambd=0.2, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250,
+        lambd=0.5, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250,
         beta_loc=0, beta_scale=0.5, alpha_loc=1, alpha_scale=0.35,
         weighting="prelec_log_elevation", alpha_dist="lognormal",
         min_start_wealth=100, pareto_shape=3, pareto_scale=200, p=0.8,
@@ -59,7 +59,7 @@ def main():
         "purpose": "single-seed software demonstration; not research evidence",
         "width": args.width, "height": args.height, "steps": args.steps, "seed": args.seed,
         "initial_row": "Step 0 is initialization; decisions have not yet been made",
-        "parameters": {"lambda": 0.2, "gamma": 0.3, "p_success": 0.8,
+        "parameters": {"lambda": 0.5, "gamma": 0.3, "p_success": 0.8,
                        "beta_loc": 0, "beta_scale": 0.5, "alpha_loc": 1,
                        "alpha_scale": 0.35, "income_rank_threshold": 0.20,
                        "tau_softmax": 3.0, "theta_softmax": 1.5},

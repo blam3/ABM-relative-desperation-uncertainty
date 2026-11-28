@@ -3,7 +3,7 @@ Main parameter sweep for the DMURD model (revised 2026-09).
 
 3 beta x 3 alpha x 5 relative-desperation thresholds x 100 replications = 4,500 runs.
 Designed to run as a 45-task Slurm array job (one condition per task); see
-slurm/submit_main_sweep.sh and CLUSTER.md.
+slurm/submit_main_sweep_lambda05.sh and CLUSTER.md.
 
 Changes from the June 2026 version
 1. Model options: weighting="prelec_log_elevation", alpha_dist="lognormal",
@@ -24,7 +24,7 @@ Environment variables (all optional)
     DMURD_STEPS         steps per run           default 25
     DMURD_ROOT_SEED     root seed               default 20260915
 
-Usage: sbatch slurm/submit_main_sweep.sh   or   python batch_run_hpc.py
+Usage: sbatch slurm/submit_main_sweep_lambda05.sh   or   python batch_run_hpc.py
 """
 import sys
 import os
@@ -52,7 +52,7 @@ WRITE_RAW = os.environ.get("DMURD_RAW", "1") == "1"
 GZIP_RAW = os.environ.get("DMURD_GZIP", "0") == "1"
 
 MODEL_OPTIONS = dict(
-    lambd=float(os.environ.get("DMURD_LAMBDA", 0.2)),
+    lambd=float(os.environ.get("DMURD_LAMBDA", 0.5)),
     gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250,
     beta_scale=0.5, alpha_scale=0.35,
     weighting="prelec_log_elevation", alpha_dist="lognormal",

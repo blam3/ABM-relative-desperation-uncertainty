@@ -17,7 +17,7 @@ DMURD_RESULTS_DIR/sensitivity_convergence_v2 (default under results/). Model
 options, seeding, and the raw/gzip switches come from batch_run_hpc.py, so the
 same environment variables apply.
 
-Usage: sbatch slurm/submit_sensitivity.sh   or   python batch_run_sensitivity.py
+Usage: sbatch slurm/submit_sensitivity_lambda05.sh   or   python batch_run_sensitivity.py
 """
 import sys
 import os

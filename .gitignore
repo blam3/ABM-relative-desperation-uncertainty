@@ -1,9 +1,46 @@
+# Environments and caches
 .venv/
+venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
+.ipynb_checkpoints/
+
+# OS files
 .DS_Store
-outputs/
+
+# Simulation output (large; regenerate with the batch scripts)
 results/
+figures/df_*_cache.csv
+*.log
+logs/
+
+# Word lock files
+~$*
+
+# Archived material and manuscript drafts: kept on disk, not published,
+# except the June 2026 model code and the September pilot (reproducibility)
+archive/*
+!archive/README.md
+!archive/june-2026-model/
+!archive/pilot-sept-2026/
+
+# Analysis products rebuilt from the sweep
+analysis/
+results_from_cluster/
+
+# Keep the pilot outputs that are committed on purpose
+!archive/pilot-sept-2026/results_*.csv
+!archive/pilot-sept-2026/stats.json
+paper/
+
+# Demo and single-run outputs (from the 2026-11-25 GitHub version)
+.pytest_cache/
+outputs/
 /model_data.csv
 /agent_data.csv
+
+# Kept local, not published: manuscript repo, submission planning, assistant config, reports
+jasss/
+CLAUDE.md
+.claude/
+reports/

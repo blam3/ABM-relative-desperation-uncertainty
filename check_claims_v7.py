@@ -17,6 +17,7 @@ is the 2.5-97.5 percentile of a bootstrap that resamples replications within eac
 condition (B = 400, seed 0).
 """
 import argparse
+import csv
 import glob
 import os
 import sys
@@ -205,10 +206,10 @@ def tex(s):
 
 
 def write_table(out, name, header_csv, rows_csv, header_tex, rows_tex, colspec):
-    with open(os.path.join(out, f"{name}.csv"), "w") as f:
-        f.write(",".join(header_csv) + "\n")
-        for r in rows_csv:
-            f.write(",".join(str(x) for x in r) + "\n")
+    with open(os.path.join(out, f"{name}.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(header_csv)
+        w.writerows(rows_csv)
     with open(os.path.join(out, f"{name}.tex"), "w") as f:
         f.write(f"\\begin{{tabular}}{{{colspec}}}\n\\hline\n" + " & ".join(header_tex) + " \\\\\n\\hline\n")
         for r in rows_tex:

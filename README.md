@@ -126,12 +126,11 @@ uncertainty, compare alternative mechanisms, and connect predictions to suitable
 empirical evidence. The local example is intentionally too small to support
 those conclusions. No full sweep was run during the presentation cleanup.
 
-## Background and provenance
+## Background
 
 Research repository maintained by Brendan Lam. Historical revisions and
 corrections are retained in [CHANGELOG.md](CHANGELOG.md); parameter rationale is
-in [PARAMETERS.md](PARAMETERS.md). AI assistance was used in repository cleanup;
-passing checks does not replace independent scientific review.
+in [PARAMETERS.md](PARAMETERS.md). AI assistance was used in repository cleanup.
 
 Selected background:
 

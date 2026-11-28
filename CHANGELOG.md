@@ -5,6 +5,22 @@ the running log from the cluster copy is summarized under "Earlier".
 
 ---
 
+## 2026-11-28 - Outputs record their own lambda and victim mode
+
+Output-only change; model dynamics are unchanged (same-seed runs are byte-identical
+in every pre-existing column and in the per-agent rows).
+
+- `run_summary.py`: two new columns at the end of every summary row, `Lambda` and
+  `Victim_Mode` (always `"none"`: no victimization logic exists yet).
+- `batch_run_hpc.py`, `batch_run_sensitivity.py`, `batch_run_neighbor_sensitivity.py`
+  and `batch_run_lambda_sweep.py` pass the lambda each run actually used;
+  `batch_run_inequality.py` appends `lambda` and `victim_mode` to its rows.
+- Every batch script prints lambda and victim mode in its start-up line, so the
+  Slurm log records them too.
+- New test: a summary row has one value per column and carries both fields.
+
+---
+
 ## 2026-11-28 - Sync of the cluster working copy with GitHub
 
 Merges the 2026-11-18 cluster work into the 2026-11-25 GitHub version. No model

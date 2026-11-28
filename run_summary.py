@@ -16,7 +16,8 @@ def summary_columns(max_steps):
             + ["Crime_Final", "Desperate_Rate_Final", "NonDesperate_Rate_Final",
                "Desperate_Share_Final", "Mean_Wealth", "Median_Wealth", "P10_Wealth",
                "P90_Wealth", "Gap_Final", "Frac_Debt", "Caught_Final",
-               "LPM_b_Desperate", "LPM_b_Wealth", "Mean_Weight_p", "Mean_Beta", "Mean_Alpha"])
+               "LPM_b_Desperate", "LPM_b_Wealth", "Mean_Weight_p", "Mean_Beta", "Mean_Alpha",
+               "Lambda", "Victim_Mode"])
 
 
 def gap(w):
@@ -30,8 +31,13 @@ def step_stats(agents):
     return float(d.mean()), float(s.mean())
 
 
-def summarize(agents, crime, desperate_share, meta, init_gap, mean_weight=np.nan):
-    """Build one summary row. `crime` and `desperate_share` are per-step lists."""
+def summarize(agents, crime, desperate_share, meta, init_gap, mean_weight=np.nan,
+              lambd=np.nan, victim_mode="none"):
+    """Build one summary row. `crime` and `desperate_share` are per-step lists.
+
+    `lambd` is the lambda the run used and `victim_mode` its victimization arm.
+    No victimization logic exists yet, so every run records victim_mode="none".
+    Both are written so each output row records its own configuration."""
     d = np.fromiter((a.decision for a in agents), dtype=float, count=len(agents))
     s = np.fromiter((a.desperate_state for a in agents), dtype=float, count=len(agents))
     w = np.fromiter((a.wealth for a in agents), dtype=float, count=len(agents))
@@ -53,4 +59,5 @@ def summarize(agents, crime, desperate_share, meta, init_gap, mean_weight=np.nan
                float((w < 0).mean()), float(caught.mean()), b_desp, b_wealth,
                float(mean_weight),
                float(np.mean([a.beta for a in agents])),
-               float(np.mean([a.alpha for a in agents]))])
+               float(np.mean([a.alpha for a in agents])),
+               float(lambd), victim_mode])

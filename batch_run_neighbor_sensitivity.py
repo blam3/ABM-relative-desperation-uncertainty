@@ -66,7 +66,8 @@ def worker(args):
         meta = (task_id, rep_id, seed, beta, FIXED_ALPHA, nu,
                 MODEL_OPTIONS["tau_softmax"], MODEL_OPTIONS["theta_softmax"],
                 MODEL_OPTIONS["desperation_rule"])
-        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap)
+        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap,
+                               lambd=opts["lambd"])
     finally:
         del model
         gc.collect()
@@ -113,7 +114,7 @@ def main():
         slurm_cpus = 0
     n_cores = min(max(1, slurm_cpus or cpu_count() - 1), SAFE_CORE_LIMIT)
     print(f"Output: {OUT_DIR} ({N_REPLICATIONS} reps x {MAX_STEPS} steps, "
-          f"{GRID}x{GRID} grid, root seed {ROOT_SEED}, lambda={MODEL_OPTIONS['lambd']})")
+          f"{GRID}x{GRID} grid, root seed {ROOT_SEED}, lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)")
 
     for idx in indices:
         run_condition(idx, n_cores)

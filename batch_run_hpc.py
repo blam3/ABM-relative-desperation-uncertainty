@@ -119,7 +119,8 @@ def run_simulation_worker(args):
         meta = (condition_index, rep_id, current_seed, beta, alpha, thresh,
                 MODEL_OPTIONS["tau_softmax"], MODEL_OPTIONS["theta_softmax"],
                 MODEL_OPTIONS["desperation_rule"])
-        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap, mean_weight)
+        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap, mean_weight,
+                               lambd=MODEL_OPTIONS["lambd"])
     finally:
         del model
         gc.collect()
@@ -197,7 +198,8 @@ def main():
         slurm_cpus = 0
     n_cores = min(slurm_cpus if slurm_cpus > 0 else max(1, cpu_count() - 1), SAFE_CORE_LIMIT)
     print(f"Output: {RUN_FOLDER} (raw={'gzip' if GZIP_RAW else WRITE_RAW}, "
-          f"{N_REPLICATIONS} reps x {MAX_STEPS} steps, root seed {ROOT_SEED})")
+          f"{N_REPLICATIONS} reps x {MAX_STEPS} steps, root seed {ROOT_SEED}, "
+          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)")
 
     for idx in indices:
         run_condition(idx, n_cores)

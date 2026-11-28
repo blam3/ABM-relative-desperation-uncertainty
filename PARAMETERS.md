@@ -190,6 +190,13 @@ constant across nu (~.02-.03) rather than diluting. Higher lambda pushes outcome
 far into the loss domain that the value function flattens and the desperation gap
 shrinks further.
 
+## 6b. Recorded configuration columns
+
+Since 2026-11-28 every summary row carries `Lambda` (the lambda the run used) and
+`Victim_Mode`. The model has no victimization logic yet, so `Victim_Mode` is always
+`"none"`; it records that the run had no victimization arm. The inequality sweep
+writes the same values as `lambda` and `victim_mode`.
+
 ## 7. Seeds
 
 Each run draws its seed from `numpy.random.SeedSequence([ROOT_SEED, condition, rep])`

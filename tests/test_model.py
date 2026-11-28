@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 import cognitive_functions as cf
+import run_summary as rs
 from run import simulate
 
 
@@ -32,6 +33,17 @@ class ModelChecks(unittest.TestCase):
         self.assertTrue(np.isfinite(frame.to_numpy()).all())
         self.assertTrue(frame["Proportion crime"].between(0, 1).all())
         self.assertTrue((frame["P90-P10"] >= 0).all())
+
+    def test_summary_row_records_lambda_and_victim_mode(self):
+        model = simulate(8, 8, 2, seed=11)
+        agents = list(model.agents)
+        row = rs.summarize(agents, [0.1, 0.1], [0.2, 0.2], [1, 0, 11, 0, 1, 0.2, 3.0, 1.5, "rank"],
+                           0.0, lambd=0.5)
+        columns = rs.summary_columns(2)
+        self.assertEqual(len(row), len(columns))
+        record = dict(zip(columns, row))
+        self.assertEqual(record["Lambda"], 0.5)
+        self.assertEqual(record["Victim_Mode"], "none")
 
     def test_invalid_demo_sizes_fail(self):
         for args in ((1, 8, 2), (8, 1, 2), (8, 8, 0)):

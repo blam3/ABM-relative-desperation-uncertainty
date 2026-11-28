@@ -68,7 +68,8 @@ def worker(args):
             desperate_share.append(s)
         meta = (task_id, rep_id, seed, beta, alpha, thresh, tau_sm, theta_sm,
                 MODEL_OPTIONS["desperation_rule"])
-        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap)
+        summary = rs.summarize(agents, crime, desperate_share, meta, init_gap,
+                               lambd=opts["lambd"])
     finally:
         del model
         gc.collect()
@@ -103,6 +104,8 @@ def main():
         slurm_cpus = 0
     n_cores = min(max(1, slurm_cpus or cpu_count() - 1), SAFE_CORE_LIMIT)
 
+    print(f"Output: {DIR_SOFTMAX} and {DIR_CONV} ({N_REPLICATIONS} reps, root seed {ROOT_SEED}, "
+          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)", flush=True)
     for tid in task_ids:
         path, spec = task_spec(tid)
         if path is None:

@@ -1,9 +1,10 @@
 """
-
 Mesa model for the DMURD model (revised 2026-09).
 
+The multiplicative desperation mechanism (use_refshift=False) was removed:
+the June 2026 sweep and the manuscript both use the reference-shift mechanism.
+New options are passed through to agents (see agents.py).
 """
-
 import mesa
 from mesa import Model
 from mesa.space import SingleGrid
@@ -26,7 +27,7 @@ def p90_p10(model):
 
 
 class rel_DMAP_model(Model):
-    def __init__(self, lambd=0.2, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250,
+    def __init__(self, lambd=0.5, gamma=0.3, reward_rb=50, reward_rf=25, cost_rb=250,
                  beta_loc=0, beta_scale=0.5, alpha_loc=1, alpha_scale=0.35,
                  min_start_wealth=100, p=0.8, width=100, height=100,
                  num_neighbors=20, income_rank_threshold=0.05,

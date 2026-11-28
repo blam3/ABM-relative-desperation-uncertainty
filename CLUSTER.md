@@ -23,9 +23,9 @@ the main sweep rather than inside it:
 
 | Directory under `$DMURD_RESULTS_ROOT` | Written by |
 |---|---|
-| `final_batch_run_v2/` | `batch_run_hpc.py` (main sweep) |
-| `sensitivity_softmax_v2/` | `batch_run_sensitivity.py` tasks 1-9 |
-| `sensitivity_convergence_v2/` | `batch_run_sensitivity.py` tasks 10-18 |
+| `final_batch_run_lambda0.5/` | `batch_run_hpc.py` (main sweep) |
+| `sensitivity_softmax_lambda0.5/` | `batch_run_sensitivity.py` tasks 1-9 |
+| `sensitivity_convergence_lambda0.5/` | `batch_run_sensitivity.py` tasks 10-18 |
 | `inequality_sweep/` | `batch_run_inequality.py` |
 
 Step 6 aggregates all four; do not aggregate only the first one.
@@ -92,14 +92,16 @@ You should see one `summary_cond_21_*.csv`, one `cond_21_*.csv.gz`, and an
 ## 4. Main sweep
 
 ```bash
-sbatch slurm/submit_main_sweep.sh
+sbatch slurm/submit_main_sweep_lambda05.sh
 ```
 
 45 array tasks, one per condition, 24 cores each, at most 12 at a time. Each task
 runs 100 replications of 10,000 agents for 25 steps: roughly 3 to 6 minutes per
 condition, so the whole array usually finishes within an hour of starting.
 
-Each condition writes two files to `$DMURD_RESULTS_DIR`:
+The sweep runs at lambda = 0.5 (`DMURD_LAMBDA`, set in the script). Each condition
+writes its summary file to `$DMURD_RESULTS_DIR`, plus a per-agent file when
+`DMURD_RAW=1`:
 
 | File | Size | Contents |
 |---|---|---|
@@ -107,10 +109,11 @@ Each condition writes two files to `$DMURD_RESULTS_DIR`:
 | `cond_<n>_*.csv.gz` | about 570 MB | One row per agent per step (gzipped) |
 
 Across 45 conditions that is about 5 MB of summaries and 26 GB of per-agent rows
-(83 GB before compression). To skip the per-agent rows entirely:
+(83 GB before compression). The script writes summaries only by default; to also
+write the per-agent rows:
 
 ```bash
-sbatch --export=ALL,DMURD_RAW=0 slurm/submit_main_sweep.sh
+sbatch --export=ALL,DMURD_RAW=1 slurm/submit_main_sweep_lambda05.sh
 ```
 
 Monitor and check for failures:
@@ -118,7 +121,7 @@ Monitor and check for failures:
 ```bash
 squeue -u $USER
 sacct -X -j <jobid> --format=JobID,State,Elapsed,MaxRSS,ExitCode
-grep -L "JOB COMPLETE" logs/sweep-*.out     # tasks that did not finish
+grep -L "JOB COMPLETE" logs/sweep-l05-*.out     # tasks that did not finish
 ```
 
 `grep -L` must print nothing. Then confirm every condition wrote its full 100
@@ -126,8 +129,8 @@ replications, because a task can be requeued mid-write and still look finished:
 
 ```bash
 R="${DMURD_RESULTS_ROOT:-$HOME/scratch/dmurd}"
-ls "$R"/final_batch_run_v2/summary_*.csv | wc -l      # expect 45
-for f in "$R"/final_batch_run_v2/summary_*.csv; do
+ls "$R"/final_batch_run_lambda0.5/summary_*.csv | wc -l      # expect 45
+for f in "$R"/final_batch_run_lambda0.5/summary_*.csv; do
   n=$(( $(wc -l < "$f") - 1 ))
   [ "$n" -eq 100 ] || echo "$f has $n rows"
 done
@@ -136,13 +139,13 @@ done
 Rerun only the conditions that failed, for example tasks 3 and 17:
 
 ```bash
-sbatch --array=3,17 slurm/submit_main_sweep.sh
+sbatch --array=3,17 slurm/submit_main_sweep_lambda05.sh
 ```
 
 ## 5. Sensitivity and supplementary sweeps
 
 ```bash
-sbatch slurm/submit_sensitivity.sh    # 18 tasks: softmax robustness, 50-step convergence
+sbatch slurm/submit_sensitivity_lambda05.sh    # 18 tasks: softmax robustness, 50-step convergence
 sbatch slurm/submit_inequality.sh     # Goal 3 / H4: exogenous inequality, alternative rule
 ```
 
@@ -150,15 +153,15 @@ Both write summaries only, and both can be submitted while the main array is sti
 queued: 18 x 24 plus the main array's 12 x 24 is 720 cores, inside the `day`
 partition's 1,500 per user.
 
-Neither writes into `final_batch_run_v2`. Both derive their output path from the
+Neither writes into `final_batch_run_lambda0.5`. Both derive their output path from the
 *parent* of `DMURD_RESULTS_DIR`, so the sensitivity summaries land in
-`$DMURD_RESULTS_ROOT/sensitivity_softmax_v2` and
-`$DMURD_RESULTS_ROOT/sensitivity_convergence_v2`, and the inequality sweep writes a
+`$DMURD_RESULTS_ROOT/sensitivity_softmax_lambda0.5` and
+`$DMURD_RESULTS_ROOT/sensitivity_convergence_lambda0.5`, and the inequality sweep writes a
 single `$DMURD_RESULTS_ROOT/inequality_sweep/summary.csv` (900 rows: 9 cells x 100
 replications). Check them the same way:
 
 ```bash
-grep -L "SENSITIVITY JOB COMPLETE" logs/sens-*.out    # expect no output
+grep -L "SENSITIVITY JOB COMPLETE" logs/sens-l05-*.out    # expect no output
 tail -1 logs/ineq-*.out                               # expect DONE
 ```
 
@@ -172,11 +175,11 @@ module load miniconda && conda activate dmurd
 cd ~/project/dmurd
 R="${DMURD_RESULTS_ROOT:-$HOME/scratch/dmurd}"
 
-python aggregate_results.py --results "$R/final_batch_run_v2" \
+python aggregate_results.py --results "$R/final_batch_run_lambda0.5" \
   --out analysis --metamodel
-python aggregate_results.py --results "$R/sensitivity_softmax_v2" \
+python aggregate_results.py --results "$R/sensitivity_softmax_lambda0.5" \
   --out analysis/sensitivity_softmax
-python aggregate_results.py --results "$R/sensitivity_convergence_v2" \
+python aggregate_results.py --results "$R/sensitivity_convergence_lambda0.5" \
   --out analysis/sensitivity_convergence
 ```
 
@@ -214,9 +217,9 @@ directory and cannot be concatenated with the main sweep.
 # on the cluster: keep the small files somewhere backed up
 R="${DMURD_RESULTS_ROOT:-$HOME/scratch/dmurd}"
 mkdir -p ~/project/dmurd_results
-cp "$R"/final_batch_run_v2/summary_*.csv ~/project/dmurd_results/
+cp "$R"/final_batch_run_lambda0.5/summary_*.csv ~/project/dmurd_results/
 cp "$R"/inequality_sweep/summary.csv ~/project/dmurd_results/inequality_summary.csv
-cp -r "$R"/sensitivity_softmax_v2 "$R"/sensitivity_convergence_v2 ~/project/dmurd_results/
+cp -r "$R"/sensitivity_softmax_lambda0.5 "$R"/sensitivity_convergence_lambda0.5 ~/project/dmurd_results/
 cp -r analysis ~/project/dmurd_results/
 
 # on your laptop
@@ -237,7 +240,8 @@ without editing code:
 | Variable | Default | Effect |
 |---|---|---|
 | `DMURD_RESULTS_ROOT` | `$HOME/scratch/dmurd` | Where output goes |
-| `DMURD_RAW` | `1` | `0` writes summaries only |
+| `DMURD_RAW` | `1` (`0` in the Slurm scripts) | `0` writes summaries only |
+| `DMURD_LAMBDA` | `0.5` (also set explicitly in every Slurm script) | Desperation severity. Before 2026-11-18 the code default was 0.2 |
 | `DMURD_GZIP` | `1` in the Slurm scripts | `0` writes plain CSV |
 | `DMURD_REPLICATIONS` | `100` | Replications per condition |
 | `DMURD_STEPS` | `25` | Steps per run |
@@ -253,10 +257,9 @@ without editing code:
 | `ModuleNotFoundError: mesa` inside a job | The job did not activate the environment. `module load miniconda` and `conda activate dmurd` belong inside the script, not in `~/.bashrc`. |
 | `CommandNotFoundError: conda activate` inside a job | The batch shell had no conda hook. `slurm/common.sh` now sources `$(conda info --base)/etc/profile.d/conda.sh` when the module does not define the shell function, so this should not recur; if it does, `module load miniconda` itself failed. |
 | Job dies immediately, no `logs/*.out` file | `logs/` did not exist at submission time. `mkdir -p logs` and resubmit (step 1). |
-| No `summary_*.csv` for the sensitivity or inequality runs in `final_batch_run_v2` | They are not written there. Look in `sensitivity_softmax_v2`, `sensitivity_convergence_v2` and `inequality_sweep` beside it (step 0). |
+| No `summary_*.csv` for the sensitivity or inequality runs in `final_batch_run_lambda0.5` | They are not written there. Look in `sensitivity_softmax_lambda0.5`, `sensitivity_convergence_lambda0.5` and `inequality_sweep` beside it (step 0). |
 | Task killed, `State=OUT_OF_MEMORY` | Raise `--mem-per-cpu` to 6G, or lower `--cpus-per-task`. Each worker holds one 10,000-agent model plus the rows for one replication. |
 | Array task hits the time limit | Resubmit only those tasks with `--array=<ids>` and a longer `--time`. The `week` partition allows 7 days but only 96 CPUs per user. |
 | Jobs sit in the queue | 45 tasks x 24 cores exceeds a polite share; the script already throttles to 12 at a time with `%12`. Lower it, or use `--partition=scavenge` (preemptable, and the scripts set `--requeue`). |
 | Disk quota errors mid-sweep | You are writing to home (125 GiB). Set `DMURD_RESULTS_ROOT` to scratch. |
 | Results differ between runs | Check that `DMURD_ROOT_SEED` did not change and that each task wrote the `Seed` column; seeds come from `SeedSequence([root, condition, rep])`. |
-

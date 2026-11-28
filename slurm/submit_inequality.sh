@@ -17,6 +17,7 @@ source "${SLURM_SUBMIT_DIR:-$PWD}/slurm/common.sh"
 
 export DMURD_RESULTS_DIR="$RESULTS_ROOT/final_batch_run_v2"
 export DMURD_RAW=0
+export DMURD_LAMBDA=0.5
 
 python batch_run_inequality.py
 echo "finished    $(date)"

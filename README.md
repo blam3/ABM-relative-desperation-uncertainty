@@ -18,7 +18,7 @@ included here. [Example data and provenance](examples/demo/README.md).
 
 ## Run a small example
 
-Use **Python 3.12**, the version tested in CI. Mesa 3.5.3 requires Python 3.12 or newer. From a terminal:
+Use **Python 3.11** with Mesa 3.3.1, the versions tested in CI and used for the research sweeps. From a terminal:
 
 ```bash
 git clone https://github.com/blam3/ABM-relative-desperation-uncertainty.git
@@ -98,7 +98,15 @@ outside Git.
 | `run.py` | Small seeded CLI example and optional exports |
 | `batch_run_hpc.py` | Main replicated parameter sweep |
 | `batch_run_sensitivity.py`, `batch_run_inequality.py` | Sensitivity designs |
+| `batch_run_neighbor_sensitivity.py` | Comparison-group size sensitivity |
+| `batch_run_lambda_sweep.py`, `analyze_lambda_sweep.py` | Desperation-severity (lambda) sweep and its diagnostic |
 | `run_summary.py`, `aggregate_results.py` | Replication-level summaries and analysis |
+| `analyze_for_manuscript.py`, `make_manuscript_figures.py`, `make_supplementary.py` | Manuscript tables and figures from the sweep summaries |
+| `archive/` | June 2026 model code and the September 2026 pilot, kept for reproducibility |
+
+Desperation severity defaults to lambda = 0.5 in `model.py`, `run.py` and
+`batch_run_hpc.py` (it was 0.2 before 2026-11-18); `DMURD_LAMBDA` overrides it
+for the batch scripts.
 | `slurm/`, `CLUSTER.md` | Research-cluster submission instructions |
 
 See [CLUSTER.md](CLUSTER.md) before running a full sweep. It is tailored to the

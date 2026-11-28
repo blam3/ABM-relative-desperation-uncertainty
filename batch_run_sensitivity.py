@@ -31,6 +31,7 @@ from multiprocessing import Pool, cpu_count
 import batch_run_hpc as main_sweep
 from batch_run_hpc import OptimizedModel, MODEL_OPTIONS, ROOT_SEED, SAFE_CORE_LIMIT
 import run_summary as rs
+from model import resolve_victim_options
 
 N_REPLICATIONS = main_sweep.N_REPLICATIONS
 BASE = os.path.dirname(main_sweep.RUN_FOLDER) or "results"
@@ -69,7 +70,8 @@ def worker(args):
         meta = (task_id, rep_id, seed, beta, alpha, thresh, tau_sm, theta_sm,
                 MODEL_OPTIONS["desperation_rule"])
         summary = rs.summarize(agents, crime, desperate_share, meta, init_gap,
-                               lambd=opts["lambd"])
+                               lambd=opts["lambd"], victim_mode=model.victim_mode,
+                               sync=model.sync, victim=model.victim_summary())
     finally:
         del model
         gc.collect()
@@ -104,8 +106,9 @@ def main():
         slurm_cpus = 0
     n_cores = min(max(1, slurm_cpus or cpu_count() - 1), SAFE_CORE_LIMIT)
 
+    _VM, _SYNC = resolve_victim_options()
     print(f"Output: {DIR_SOFTMAX} and {DIR_CONV} ({N_REPLICATIONS} reps, root seed {ROOT_SEED}, "
-          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)", flush=True)
+          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode={_VM}, sync={int(_SYNC)})", flush=True)
     for tid in task_ids:
         path, spec = task_spec(tid)
         if path is None:

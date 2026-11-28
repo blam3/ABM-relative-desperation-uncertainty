@@ -192,10 +192,40 @@ shrinks further.
 
 ## 6b. Recorded configuration columns
 
-Since 2026-11-28 every summary row carries `Lambda` (the lambda the run used) and
-`Victim_Mode`. The model has no victimization logic yet, so `Victim_Mode` is always
-`"none"`; it records that the run had no victimization arm. The inequality sweep
-writes the same values as `lambda` and `victim_mode`.
+Since 2026-11-28 every summary row carries `Lambda` (the lambda the run used),
+`Victim_Mode` and `Sync` (the arm and schedule the run used). The inequality sweep
+writes the same values as `lambda`, `victim_mode` and `sync`.
+
+## 6c. Victimization arms (victim_mode, sync)
+
+| Setting | Env var | Constructor argument | Default | Values |
+|---|---|---|---|---|
+| Victimization arm | `DMURD_VICTIM` | `victim_mode` | `none` | `none`, `global`, `local` |
+| Schedule | `DMURD_SYNC` | `sync` | `0` (asynchronous) | `0`, `1` |
+
+An explicit constructor argument overrides the environment variable. Defaults
+reproduce tag `jasss-v1` exactly (`tests/test_victimization.py`, test 1).
+
+- `none`: an undetected offense adds R1 to the offender from nothing (jasss-v1).
+- `global`: the victim is drawn uniformly from all other agents.
+- `local`: the victim is drawn uniformly from the offender's comparison sample this step.
+- In both arms, an undetected offense moves min(R1, max(victim wealth, 0)) from
+  victim to offender, so theft is zero-sum. A detected offender pays C and no victim
+  is drawn. Decisions still evaluate the reward for offending as R1.
+- Asynchronous (`sync = 0`): the victim's wealth changes immediately, under the
+  existing random-order `shuffle_do`.
+- Synchronous (`sync = 1`): every agent decides from start-of-step wealth. Thefts are
+  then applied in random order, each capped at the victim's current wealth. Income,
+  penalties and living costs are applied last.
+- Victim draws use a separate random stream, so the other draws are unchanged.
+
+New summary columns, after `Victim_Mode`: `Sync`, `Victim_Rate_Final` and
+`Victim_Rate_Mean` (share of agents victimized at the last step and averaged over
+steps), `Mean_Loss_Final` (mean amount lost per agent at the last step),
+`Mean_Transfer` and `Mean_Transfer_Final` (mean amount per theft, NaN with no
+thefts) and `Zero_Transfer_Share` (share of thefts that transferred nothing).
+New per-agent raw columns: `Offended`, `Victimized`, `AmountLost`, `OffenderIDs`
+(";"-separated), `VictimID` (-1 if none) and `AmountStolen`.
 
 ## 7. Seeds
 

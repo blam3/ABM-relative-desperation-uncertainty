@@ -61,6 +61,24 @@ class individual(FixedAgent):
         self.income_rank = 0
         self.wealth_start = self.wealth
         self.wealth_end = self.wealth
+        self.comparison_sample = []
+        self.detected = False
+        self.pending_victim = None
+        self.reset_step_log()
+
+    def reset_step_log(self):
+        """Per-step victimization and accounting fields (reset by the model each step)."""
+        self.offended = 0
+        self.victimized = 0
+        self.amount_lost = 0.0
+        self.offender_ids = []
+        self.victim_id = -1
+        self.amount_stolen = 0.0
+        self.income = 0.0
+        self.penalty = 0.0
+        self.living_cost = 0.0
+        self.unfunded_gain = 0.0  # R1 created from nothing (victim_mode "none" only)
+        self.done = False
 
     def relative_desperation(self):
         """Sample 20 of the 48 agents within a radius-3 Moore neighborhood, compute
@@ -72,6 +90,7 @@ class individual(FixedAgent):
             neighbors = self.model.random.sample(all_neighbors, self.num_neighbors)
         else:
             neighbors = all_neighbors
+        self.comparison_sample = neighbors
         neighbor_wealths = [n.wealth for n in neighbors]
         num_poorer = sum(1 for w in neighbor_wealths if w <= self.wealth)
         self.income_rank = cf.cal_income_rank(num_poorer + 1, len(neighbors) + 1)
@@ -111,19 +130,45 @@ class individual(FixedAgent):
                                    tau=self.tau_softmax, theta=self.theta_softmax)
         self.decision = int(bernoulli.rvs(probs[0]))
 
-    def step(self):
+    def decide(self):
+        """Make every random draw for this step, in the jasss-v1 order: comparison
+        sample, decision, detection (offenders only), living cost. Wealth is not
+        changed here. A victim is drawn (from the model's separate victim RNG) only
+        for an undetected offense in a victim arm."""
         self.wealth_start = self.wealth
         self.relative_desperation()
         self.compute_expected_utilities()
-        if self.decision == 1:  # offends
-            if bernoulli.rvs(self.p) == 1:
-                self.caught = False
-                self.wealth += self.reward_rb
+        self.offended = self.decision
+        self.pending_victim = None
+        if self.decision == 1:  # offends; p is the probability of not being caught
+            self.detected = bernoulli.rvs(self.p) != 1
+            self.caught = self.detected
+        living_cost_rate = np.clip(np.random.normal(0.8, 0.1), 0.1, 1)
+        self.living_cost = living_cost_rate * self.reward_rf
+        if self.decision == 1 and not self.detected and self.model.victim_mode != "none":
+            self.pending_victim = self.model.draw_victim(self)
+
+    def settle(self):
+        """Apply own income or penalty, then living cost. In a victim arm the gain
+        from an undetected offense is the transfer, applied by model.transfer."""
+        if self.decision == 1:
+            if not self.detected:
+                if self.model.victim_mode == "none":
+                    self.unfunded_gain = self.reward_rb
+                    self.wealth += self.reward_rb
             else:
-                self.caught = True
+                self.penalty = self.cost_rb
                 self.wealth -= self.cost_rb
         else:  # law-abiding
+            self.income = self.reward_rf
             self.wealth += self.reward_rf
-        living_cost_rate = np.clip(np.random.normal(0.8, 0.1), 0.1, 1)
-        self.wealth = self.wealth - (living_cost_rate * self.reward_rf)
+        self.wealth = self.wealth - self.living_cost
         self.wealth_end = self.wealth
+
+    def step(self):
+        """Asynchronous step: the victim's wealth changes immediately."""
+        self.decide()
+        if self.pending_victim is not None:
+            self.model.transfer(self, self.pending_victim)
+        self.settle()
+        self.done = True

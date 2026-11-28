@@ -22,6 +22,7 @@ import itertools
 import numpy as np
 from multiprocessing import Pool, cpu_count
 import batch_run_hpc as main_sweep
+from model import resolve_victim_options
 from batch_run_hpc import OptimizedModel, MODEL_OPTIONS, ROOT_SEED
 
 N_REPLICATIONS = main_sweep.N_REPLICATIONS
@@ -55,14 +56,16 @@ def worker(args):
         row[f"desperate_{s + 1}"] = ds.mean()
         row[f"gap_{s + 1}"] = gap([a.wealth for a in agents])
     row["lambda"] = opts["lambd"]   # recorded so the output carries its own configuration
-    row["victim_mode"] = "none"     # no victimization logic exists yet
+    row["victim_mode"] = m.victim_mode
+    row["sync"] = int(m.sync)
     return row
 
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
+    _VM, _SYNC = resolve_victim_options()
     print(f"Output: {OUT} ({N_REPLICATIONS} reps x {MAX_STEPS} steps, root seed {ROOT_SEED}, "
-          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)", flush=True)
+          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode={_VM}, sync={int(_SYNC)})", flush=True)
     cells = list(itertools.product(SPREADS, RULES))
     tasks = [(i, r, sp, ru, th) for i, (sp, (ru, th)) in enumerate(cells) for r in range(N_REPLICATIONS)]
     with Pool(max(1, min(cpu_count() - 1, 24)), maxtasksperchild=1) as pool, open(os.path.join(OUT, "summary.csv"), "w", newline="") as f:

@@ -23,6 +23,8 @@ Environment variables (all optional)
     DMURD_REPLICATIONS  replications per cell   default 100
     DMURD_STEPS         steps per run           default 25
     DMURD_ROOT_SEED     root seed               default 20260915
+    DMURD_VICTIM        none | global | local   default none (read by model.py)
+    DMURD_SYNC          1 = synchronous step    default 0    (read by model.py)
 
 Usage: sbatch slurm/submit_main_sweep_lambda05.sh   or   python batch_run_hpc.py
 """
@@ -36,7 +38,7 @@ import time
 import numpy as np
 from multiprocessing import Pool, cpu_count
 
-from model import rel_DMAP_model
+from model import rel_DMAP_model, resolve_victim_options
 import cognitive_functions as cf
 import run_summary as rs
 
@@ -72,13 +74,14 @@ ALL_COMBINATIONS = list(itertools.product(BETA_LOC_VALUES, ALPHA_LOC_VALUES, THR
 class OptimizedModel(rel_DMAP_model):
     """Skips the DataCollector to save memory; rows are extracted manually."""
     def step(self):
-        self.agents.shuffle_do("step")
+        self.advance()  # honours victim_mode and sync
 
 
 def raw_header():
     return ["ReplicationID", "Step", "AgentID", "Wealth", "WealthStart",
             "Decision", "Rank", "Desperate", "RelDeprivation", "Position", "Caught",
-            "Beta", "Alpha", "Beta_Loc", "Alpha_Loc", "Threshold"]
+            "Beta", "Alpha", "Beta_Loc", "Alpha_Loc", "Threshold",
+            "Offended", "Victimized", "AmountLost", "OffenderIDs", "VictimID", "AmountStolen"]
 
 
 def run_seed(condition_index, rep_id):
@@ -113,14 +116,18 @@ def run_simulation_worker(args):
                      round(float(a.wealth_start), 2), a.decision, round(a.income_rank, 4),
                      int(a.desperate_state), round(float(a.rel_deprivation), 2),
                      f"{a.pos[0]};{a.pos[1]}", int(a.caught), round(float(a.beta), 4),
-                     round(float(a.alpha), 4), beta, alpha, thresh]
+                     round(float(a.alpha), 4), beta, alpha, thresh,
+                     int(a.offended), int(a.victimized), round(float(a.amount_lost), 2),
+                     ";".join(str(i) for i in a.offender_ids), a.victim_id,
+                     round(float(a.amount_stolen), 2)]
                     for a in agents
                 )
         meta = (condition_index, rep_id, current_seed, beta, alpha, thresh,
                 MODEL_OPTIONS["tau_softmax"], MODEL_OPTIONS["theta_softmax"],
                 MODEL_OPTIONS["desperation_rule"])
         summary = rs.summarize(agents, crime, desperate_share, meta, init_gap, mean_weight,
-                               lambd=MODEL_OPTIONS["lambd"])
+                               lambd=MODEL_OPTIONS["lambd"], victim_mode=model.victim_mode,
+                               sync=model.sync, victim=model.victim_summary())
     finally:
         del model
         gc.collect()
@@ -197,9 +204,10 @@ def main():
     except (ValueError, TypeError):
         slurm_cpus = 0
     n_cores = min(slurm_cpus if slurm_cpus > 0 else max(1, cpu_count() - 1), SAFE_CORE_LIMIT)
+    _VM, _SYNC = resolve_victim_options()
     print(f"Output: {RUN_FOLDER} (raw={'gzip' if GZIP_RAW else WRITE_RAW}, "
           f"{N_REPLICATIONS} reps x {MAX_STEPS} steps, root seed {ROOT_SEED}, "
-          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)")
+          f"lambda={MODEL_OPTIONS['lambd']}, victim_mode={_VM}, sync={int(_SYNC)})")
 
     for idx in indices:
         run_condition(idx, n_cores)

@@ -17,7 +17,15 @@ def summary_columns(max_steps):
                "Desperate_Share_Final", "Mean_Wealth", "Median_Wealth", "P10_Wealth",
                "P90_Wealth", "Gap_Final", "Frac_Debt", "Caught_Final",
                "LPM_b_Desperate", "LPM_b_Wealth", "Mean_Weight_p", "Mean_Beta", "Mean_Alpha",
-               "Lambda", "Victim_Mode"])
+               "Lambda", "Victim_Mode"]
+            + VICTIM_COLUMNS)
+
+
+# Appended after Victim_Mode so every jasss-v1 column keeps its position.
+VICTIM_COLUMNS = ["Sync", "Victim_Rate_Final", "Victim_Rate_Mean", "Mean_Loss_Final",
+                  "Mean_Transfer", "Mean_Transfer_Final", "Zero_Transfer_Share"]
+_VICTIM_KEYS = ["victim_rate_final", "victim_rate_mean", "mean_loss_final",
+                "mean_transfer", "mean_transfer_final", "zero_transfer_share"]
 
 
 def gap(w):
@@ -32,12 +40,15 @@ def step_stats(agents):
 
 
 def summarize(agents, crime, desperate_share, meta, init_gap, mean_weight=np.nan,
-              lambd=np.nan, victim_mode="none"):
+              lambd=np.nan, victim_mode="none", sync=False, victim=None):
     """Build one summary row. `crime` and `desperate_share` are per-step lists.
 
-    `lambd` is the lambda the run used and `victim_mode` its victimization arm.
-    No victimization logic exists yet, so every run records victim_mode="none".
-    Both are written so each output row records its own configuration."""
+    `lambd` is the lambda the run used, `victim_mode` its victimization arm and
+    `sync` its schedule; all are written so each output row records its own
+    configuration. `victim` is model.victim_summary() (None gives NaN columns).
+    Victim_Rate_* is the share of agents victimized (per step); Mean_Loss_Final is
+    the mean amount lost per agent at the last step; Mean_Transfer is the mean
+    amount per theft over the run (NaN when there were no thefts, as in "none")."""
     d = np.fromiter((a.decision for a in agents), dtype=float, count=len(agents))
     s = np.fromiter((a.desperate_state for a in agents), dtype=float, count=len(agents))
     w = np.fromiter((a.wealth for a in agents), dtype=float, count=len(agents))
@@ -60,4 +71,5 @@ def summarize(agents, crime, desperate_share, meta, init_gap, mean_weight=np.nan
                float(mean_weight),
                float(np.mean([a.beta for a in agents])),
                float(np.mean([a.alpha for a in agents])),
-               float(lambd), victim_mode])
+               float(lambd), victim_mode, int(bool(sync))]
+            + [float(victim[k]) if victim else float("nan") for k in _VICTIM_KEYS])

@@ -25,6 +25,7 @@ from multiprocessing import Pool, cpu_count
 import batch_run_hpc as main_sweep
 from batch_run_hpc import OptimizedModel, MODEL_OPTIONS, ROOT_SEED, SAFE_CORE_LIMIT
 import run_summary as rs
+from model import resolve_victim_options
 
 N_REPLICATIONS = int(os.environ.get("DMURD_NEIGHBOR_REPS", 20))
 MAX_STEPS = 25
@@ -67,7 +68,8 @@ def worker(args):
                 MODEL_OPTIONS["tau_softmax"], MODEL_OPTIONS["theta_softmax"],
                 MODEL_OPTIONS["desperation_rule"])
         summary = rs.summarize(agents, crime, desperate_share, meta, init_gap,
-                               lambd=opts["lambd"])
+                               lambd=opts["lambd"], victim_mode=model.victim_mode,
+                               sync=model.sync, victim=model.victim_summary())
     finally:
         del model
         gc.collect()
@@ -113,8 +115,9 @@ def main():
     except (ValueError, TypeError):
         slurm_cpus = 0
     n_cores = min(max(1, slurm_cpus or cpu_count() - 1), SAFE_CORE_LIMIT)
+    _VM, _SYNC = resolve_victim_options()
     print(f"Output: {OUT_DIR} ({N_REPLICATIONS} reps x {MAX_STEPS} steps, "
-          f"{GRID}x{GRID} grid, root seed {ROOT_SEED}, lambda={MODEL_OPTIONS['lambd']}, victim_mode=none)")
+          f"{GRID}x{GRID} grid, root seed {ROOT_SEED}, lambda={MODEL_OPTIONS['lambd']}, victim_mode={_VM}, sync={int(_SYNC)})")
 
     for idx in indices:
         run_condition(idx, n_cores)

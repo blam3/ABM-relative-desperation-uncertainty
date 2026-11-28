@@ -5,6 +5,32 @@ the running log from the cluster copy is summarized under "Earlier".
 
 ---
 
+## 2026-11-28 - Victimization arms (victim_mode) and synchronous schedule (sync)
+
+Behind flags whose defaults reproduce tag `jasss-v1` (local tag at `6548381`).
+With `victim_mode="none"` and `sync=False`, same-seed output is identical to
+jasss-v1 in every pre-existing column, at full float precision.
+
+- `model.py`: `victim_mode` in {"none", "global", "local"} and `sync`. Both are read
+  from `DMURD_VICTIM` / `DMURD_SYNC` unless passed explicitly. New methods:
+  `draw_victim`, `transfer`, `advance` (one step without data collection) and
+  `victim_summary`. Victim draws come from a separate RNG.
+- `agents.py`: `step()` is split into `decide()` (all random draws, in the jasss-v1
+  order) and `settle()`, which applies income, penalty and living cost. The
+  comparison sample is stored, and per-step accounting and victimization fields
+  are logged.
+- `run_summary.py`: new columns after `Victim_Mode`: `Sync`, `Victim_Rate_Final`,
+  `Victim_Rate_Mean`, `Mean_Loss_Final`, `Mean_Transfer`, `Mean_Transfer_Final`
+  and `Zero_Transfer_Share`.
+- `batch_run_hpc.py`: `OptimizedModel.step` calls `advance()`, so sync mode is
+  honored. Six raw columns are appended.
+- All batch scripts log and record the `victim_mode` and `sync` that actually ran,
+  replacing the hard-coded "none".
+- New `tests/test_victimization.py` (with `tests/_trajectory_driver.py`) covers the
+  jasss-v1 regression, wealth accounting, sampling and an opt-in smoke test.
+
+---
+
 ## 2026-11-28 - Outputs record their own lambda and victim mode
 
 Output-only change; model dynamics are unchanged (same-seed runs are byte-identical
